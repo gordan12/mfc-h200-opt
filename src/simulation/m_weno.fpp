@@ -120,8 +120,8 @@ contains
 
         call s_compute_weno_coefficients(1, is1_weno)
 
-        ! Only MP-WENO and THINC read the packed copy; the reconstruction kernels read v_vf directly
-        if (mp_weno .or. int_comp > 0) then
+        ! Only THINC reads the packed copy; the reconstruction kernels (MP-WENO included) read v_vf directly
+        if (int_comp > 0) then
             @:ALLOCATE(v_rs_weno(is1_weno%beg:is1_weno%end, is2_weno%beg:is2_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
         end if
 
@@ -921,6 +921,13 @@ contains
         real(wp)                  :: tau
         integer                   :: i, j, k, l, q
         real(wp)                  :: vp0, vp1, vp2, vp3, vm1, vm2, vm3
+        ! MP-WENO bound (Suresh & Huynh 1997), applied in the WENO5 kernel to the values before they are stored
+        real(wp)            :: wL, wR                 !< WENO5 left/right face values
+        real(wp)            :: d_m1, d_0, d_p1        !< second differences centered at j-1, j, j+1
+        real(wp)            :: md_m, md_p             !< median curvatures of (d_m1, d_0) and (d_0, d_p1)
+        real(wp)            :: v_UL, v_MD, v_LC, v_min, v_max
+        real(wp), parameter :: alpha_mp = 2._wp       !< max CFL stability parameter (CFL < 1/(1+alpha))
+        real(wp), parameter :: beta_mp = 4._wp/3._wp  !< local curvature freedom parameter
 
         is1_weno = is1_weno_d
         is2_weno = is2_weno_d
@@ -974,8 +981,8 @@ contains
             end if
         end if
 
-        ! The reconstruction kernels read the stencil straight from v_vf; only MP-WENO and THINC still read the packed copy
-        if (weno_order /= 1 .and. (mp_weno .or. int_comp > 0) .and. .not. f_optional_true(packed)) then
+        ! The reconstruction kernels read the stencil straight from v_vf; only THINC still reads the packed copy
+        if (weno_order /= 1 .and. int_comp > 0 .and. .not. f_optional_true(packed)) then
             call s_pack_weno_input_arr(v_vf)
         end if
 
@@ -1079,7 +1086,8 @@ contains
                     #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
                     if (weno_dir == ${WENO_DIR}$) then
                         $:GPU_PARALLEL_LOOP(collapse=3, privateArrays='[dvd, poly, beta, alpha, omega, delta]', private='[tau, q, &
-                                            & vp0, vm1, vm2, vp1, vp2]')
+                                            & vp0, vm1, vm2, vp1, vp2, wL, wR, d_m1, d_0, d_p1, md_m, md_p, v_UL, v_MD, v_LC, &
+                                            & v_min, v_max]')
                         do l = ${Z_BND}$%beg, ${Z_BND}$%end
                             do k = ${Y_BND}$%beg, ${Y_BND}$%end
                                 do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -1174,7 +1182,7 @@ contains
                                         omega(0) = alpha(0)/(alpha(0) + alpha(1) + alpha(2))
                                         omega(1) = alpha(1)/(alpha(0) + alpha(1) + alpha(2))
                                         omega(2) = alpha(2)/(alpha(0) + alpha(1) + alpha(2))
-                                        vL_rs_vf_x(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2)
+                                        wL = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2)
 
                                         ! reconstruct from right side
 
@@ -1214,16 +1222,50 @@ contains
                                         omega(0) = alpha(0)/(alpha(0) + alpha(1) + alpha(2))
                                         omega(1) = alpha(1)/(alpha(0) + alpha(1) + alpha(2))
                                         omega(2) = alpha(2)/(alpha(0) + alpha(1) + alpha(2))
-                                        vR_rs_vf_x(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2)
+                                        wR = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2)
+
+                                        if (mp_weno) then
+                                            ! Same arithmetic as the former s_preserve_monotonicity pass; the left median and
+                                            ! right large-curvature terms share one minmod, as do the other two.
+                                            d_m1 = vp0 + vm2 - vm1*2._wp
+                                            d_0 = vp1 + vm1 - vp0*2._wp
+                                            d_p1 = vp2 + vp0 - vp1*2._wp
+
+                                            md_m = (sign(1._wp, 4._wp*d_m1 - d_0) + sign(1._wp, &
+                                                    & 4._wp*d_0 - d_m1))*abs((sign(1._wp, 4._wp*d_m1 - d_0) + sign(1._wp, &
+                                                    & d_m1))*(sign(1._wp, 4._wp*d_m1 - d_0) + sign(1._wp, &
+                                                    & d_0)))*min(abs(4._wp*d_m1 - d_0), abs(d_m1), abs(4._wp*d_0 - d_m1), &
+                                                    & abs(d_0))/8._wp
+                                            md_p = (sign(1._wp, 4._wp*d_0 - d_p1) + sign(1._wp, &
+                                                    & 4._wp*d_p1 - d_0))*abs((sign(1._wp, 4._wp*d_0 - d_p1) + sign(1._wp, &
+                                                    & d_0))*(sign(1._wp, 4._wp*d_0 - d_p1) + sign(1._wp, &
+                                                    & d_p1)))*min(abs(4._wp*d_0 - d_p1), abs(d_0), abs(4._wp*d_p1 - d_0), &
+                                                    & abs(d_p1))/8._wp
+
+                                            v_UL = vp0 - (vp1 - vp0)*alpha_mp
+                                            v_MD = (vp0 + vm1 - md_m)*5.e-1_wp
+                                            v_LC = vp0 - (vp1 - vp0)*5.e-1_wp + beta_mp*md_p
+                                            v_min = max(min(vp0, vm1, v_MD), min(vp0, v_UL, v_LC))
+                                            v_max = min(max(vp0, vm1, v_MD), max(vp0, v_UL, v_LC))
+                                            wL = wL + (sign(5.e-1_wp, v_min - wL) + sign(5.e-1_wp, &
+                                                       & v_max - wL))*min(abs(v_min - wL), abs(v_max - wL))
+
+                                            v_UL = vp0 + (vp0 - vm1)*alpha_mp
+                                            v_MD = (vp0 + vp1 - md_p)*5.e-1_wp
+                                            v_LC = vp0 + (vp0 - vm1)*5.e-1_wp + beta_mp*md_m
+                                            v_min = max(min(vp0, vp1, v_MD), min(vp0, v_UL, v_LC))
+                                            v_max = min(max(vp0, vp1, v_MD), max(vp0, v_UL, v_LC))
+                                            wR = wR + (sign(5.e-1_wp, v_min - wR) + sign(5.e-1_wp, &
+                                                       & v_max - wR))*min(abs(v_min - wR), abs(v_max - wR))
+                                        end if
+
+                                        vL_rs_vf_x(j, k, l, i) = wL
+                                        vR_rs_vf_x(j, k, l, i) = wR
                                     end do
                                 end do
                             end do
                         end do
                         $:END_GPU_PARALLEL_LOOP()
-
-                        if (mp_weno) then
-                            call s_preserve_monotonicity(v_rs_weno, vL_rs_vf_x, vR_rs_vf_x, weno_dir)
-                        end if
                     end if
                 #:endfor
             #:endif
@@ -1474,115 +1516,6 @@ contains
 
     end subroutine s_weno
 
-    !> Enforce monotonicity-preserving bounds on the WENO reconstruction
-    subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf, weno_dir)
-
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: v_rs_ws
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf, vR_rs_vf
-        integer, intent(in) :: weno_dir
-        integer :: i, j, k, l
-        real(wp), dimension(-1:1) :: d  !< Curvature measures at the zone centers
-        real(wp) :: d_MD, d_LC          !< Median (md) curvature and large curvature (LC) measures
-        ! The left and right upper bounds (UL), medians, large curvatures, minima, and maxima of the WENO-reconstructed values of
-        ! the cell- average variables.
-        real(wp)            :: vL_UL, vR_UL
-        real(wp)            :: vL_MD, vR_MD
-        real(wp)            :: vL_LC, vR_LC
-        real(wp)            :: vL_min, vR_min
-        real(wp)            :: vL_max, vR_max
-        real(wp), parameter :: alpha = 2._wp       !< Max CFL stability parameter (CFL < 1/(1+alpha))
-        real(wp), parameter :: beta = 4._wp/3._wp  !< Local curvature freedom parameter
-        real(wp), parameter :: alpha_mp = 2._wp
-        real(wp), parameter :: beta_mp = 4._wp/3._wp
-        real(wp)            :: vp0, vp1, vp2, vm1, vm2
-
-        #:for WENO_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
-                    [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1_weno', 'is2_weno', 'is3_weno'), &
-                     (2, 'y', 'k', 'j, {STENCIL_IDX}, l', 'is2_weno', 'is1_weno', 'is3_weno'), &
-                     (3, 'z', 'l', 'j, k, {STENCIL_IDX}', 'is3_weno', 'is2_weno', 'is1_weno')]
-            #:set SV = STENCIL_VAR
-            #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
-            if (weno_dir == ${WENO_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=4, privateArrays='[d]', private='[vp0, vp1, vp2, vm1, vm2]')
-                do l = ${Z_BND}$%beg, ${Z_BND}$%end
-                    do k = ${Y_BND}$%beg, ${Y_BND}$%end
-                        do j = ${X_BND}$%beg, ${X_BND}$%end
-                            do i = 1, v_size
-                                ! Second-order undivided differences for curvature estimation
-
-                                vp0 = v_rs_ws(${SF('')}$, i)
-                                vm1 = v_rs_ws(${SF(' - 1')}$, i)
-                                vm2 = v_rs_ws(${SF(' - 2')}$, i)
-                                vp1 = v_rs_ws(${SF(' + 1')}$, i)
-                                vp2 = v_rs_ws(${SF(' + 2')}$, i)
-
-                                d(-1) = vp0 + vm2 - vm1*2._wp
-                                d(0) = vp1 + vm1 - vp0*2._wp
-                                d(1) = vp2 + vp0 - vp1*2._wp
-
-                                ! Median function for oscillation detection
-                                d_MD = (sign(1._wp, 4._wp*d(-1) - d(0)) + sign(1._wp, 4._wp*d(0) - d(-1)))*abs((sign(1._wp, &
-                                        & 4._wp*d(-1) - d(0)) + sign(1._wp, d(-1)))*(sign(1._wp, &
-                                        & 4._wp*d(-1) - d(0)) + sign(1._wp, d(0))))*min(abs(4._wp*d(-1) - d(0)), abs(d(-1)), &
-                                        & abs(4._wp*d(0) - d(-1)), abs(d(0)))/8._wp
-
-                                d_LC = (sign(1._wp, 4._wp*d(0) - d(1)) + sign(1._wp, 4._wp*d(1) - d(0)))*abs((sign(1._wp, &
-                                        & 4._wp*d(0) - d(1)) + sign(1._wp, d(0)))*(sign(1._wp, 4._wp*d(0) - d(1)) + sign(1._wp, &
-                                        & d(1))))*min(abs(4._wp*d(0) - d(1)), abs(d(0)), abs(4._wp*d(1) - d(0)), abs(d(1)))/8._wp
-
-                                vL_UL = vp0 - (vp1 - vp0)*alpha_mp
-
-                                vL_MD = (vp0 + vm1 - d_MD)*5.e-1_wp
-
-                                vL_LC = vp0 - (vp1 - vp0)*5.e-1_wp + beta_mp*d_LC
-
-                                vL_min = max(min(vp0, vm1, vL_MD), min(vp0, vL_UL, vL_LC))
-
-                                vL_max = min(max(vp0, vm1, vL_MD), max(vp0, vL_UL, vL_LC))
-
-                                vL_rs_vf(j, k, l, i) = vL_rs_vf(j, k, l, i) + (sign(5.e-1_wp, vL_min - vL_rs_vf(j, k, l, &
-                                         & i)) + sign(5.e-1_wp, vL_max - vL_rs_vf(j, k, l, i)))*min(abs(vL_min - vL_rs_vf(j, k, &
-                                         & l, i)), abs(vL_max - vL_rs_vf(j, k, l, i)))
-                                ! END: Left Monotonicity Preserving Bound
-
-                                ! Right Monotonicity Preserving Bound
-                                d(-1) = vp0 + vm2 - vm1*2._wp
-                                d(0) = vp1 + vm1 - vp0*2._wp
-                                d(1) = vp2 + vp0 - vp1*2._wp
-
-                                d_MD = (sign(1._wp, 4._wp*d(0) - d(1)) + sign(1._wp, 4._wp*d(1) - d(0)))*abs((sign(1._wp, &
-                                        & 4._wp*d(0) - d(1)) + sign(1._wp, d(0)))*(sign(1._wp, 4._wp*d(0) - d(1)) + sign(1._wp, &
-                                        & d(1))))*min(abs(4._wp*d(0) - d(1)), abs(d(0)), abs(4._wp*d(1) - d(0)), abs(d(1)))/8._wp
-
-                                d_LC = (sign(1._wp, 4._wp*d(-1) - d(0)) + sign(1._wp, 4._wp*d(0) - d(-1)))*abs((sign(1._wp, &
-                                        & 4._wp*d(-1) - d(0)) + sign(1._wp, d(-1)))*(sign(1._wp, &
-                                        & 4._wp*d(-1) - d(0)) + sign(1._wp, d(0))))*min(abs(4._wp*d(-1) - d(0)), abs(d(-1)), &
-                                        & abs(4._wp*d(0) - d(-1)), abs(d(0)))/8._wp
-
-                                vR_UL = vp0 + (vp0 - vm1)*alpha_mp
-
-                                vR_MD = (vp0 + vp1 - d_MD)*5.e-1_wp
-
-                                vR_LC = vp0 + (vp0 - vm1)*5.e-1_wp + beta_mp*d_LC
-
-                                vR_min = max(min(vp0, vp1, vR_MD), min(vp0, vR_UL, vR_LC))
-
-                                vR_max = min(max(vp0, vp1, vR_MD), max(vp0, vR_UL, vR_LC))
-
-                                vR_rs_vf(j, k, l, i) = vR_rs_vf(j, k, l, i) + (sign(5.e-1_wp, vR_min - vR_rs_vf(j, k, l, &
-                                         & i)) + sign(5.e-1_wp, vR_max - vR_rs_vf(j, k, l, i)))*min(abs(vR_min - vR_rs_vf(j, k, &
-                                         & l, i)), abs(vR_max - vR_rs_vf(j, k, l, i)))
-                                ! END: Right Monotonicity Preserving Bound
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-        #:endfor
-
-    end subroutine s_preserve_monotonicity
-
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_weno_module()
 
@@ -1590,7 +1523,7 @@ contains
 
         ! Deallocating the WENO-stencil of the WENO-reconstructed variables
 
-        if (mp_weno .or. int_comp > 0) then
+        if (int_comp > 0) then
             @:DEALLOCATE(v_rs_weno)
         end if
 
