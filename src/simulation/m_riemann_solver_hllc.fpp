@@ -267,8 +267,10 @@ contains
                                         call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
                                     end if
 
-                                    call s_compute_energy(pres_L, alpha_rho_L, alpha_L, vel_L_rms, E_L)
-                                    call s_compute_energy(pres_R, alpha_rho_R, alpha_R, vel_R_rms, E_R)
+                                    call s_compute_energy_from_mixture(pres_L, rho_L, gamma_L, pi_inf_L, qv_L, &
+                                                                       & alpha_L(num_fluids), vel_L_rms, E_L)
+                                    call s_compute_energy_from_mixture(pres_R, rho_R, gamma_R, pi_inf_R, qv_R, &
+                                                                       & alpha_R(num_fluids), vel_R_rms, E_R)
 
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
@@ -317,7 +319,8 @@ contains
                                                & - rho_R*vel_R(${PERM[0]}$)*(s_R - vel_R(${PERM[0]}$)))/(rho_L*(s_L &
                                                & - vel_L(${PERM[0]}$)) - rho_R*(s_R - vel_R(${PERM[0]}$)))
                                     else if (wave_speeds == wave_speeds_pressure) then
-                                        pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(${PERM[0]}$) - vel_R(${PERM[0]}$)))
+                                        pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(${PERM[0]}$) &
+                                                            & - vel_R(${PERM[0]}$)))
 
                                         pres_SR = pres_SL
 
@@ -334,7 +337,8 @@ contains
                                         s_L = vel_L(${PERM[0]}$) - c_L*Ms_L
                                         s_R = vel_R(${PERM[0]}$) + c_R*Ms_R
 
-                                        s_S = 5.e-1_wp*((vel_L(${PERM[0]}$) + vel_R(${PERM[0]}$)) + (pres_L - pres_R)/(rho_avg*c_avg))
+                                        s_S = 5.e-1_wp*((vel_L(${PERM[0]}$) + vel_R(${PERM[0]}$)) + (pres_L - pres_R) &
+                                                        & /(rho_avg*c_avg))
                                     end if
 
                                     ! follows Einfeldt et al. s_M/P = min/max(0.,s_L/R)
@@ -382,11 +386,10 @@ contains
                                     ! MOMENTUM FLUX. f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
-                                        flux_rsx_vf(${SF('')}$, &
-                                                    & eqn_idx%cont%end + ${DIDX}$) = rho_Star*vel_K_Star*(merge(1._wp, 0._wp, i == 1) &
-                                                    & *vel_K_Star + (1._wp - merge(1._wp, 0._wp, i == 1))*(xi_M*vel_L(${DIDX}$) &
-                                                    & + xi_P*vel_R(${DIDX}$))) + merge(1._wp, 0._wp, i == 1)*p_Star + (s_M/s_L) &
-                                                    & *(s_P/s_R)*merge(1._wp, 0._wp, i == 1)*pcorr
+                                        flux_rsx_vf(${SF('')}$, eqn_idx%cont%end + ${DIDX}$) = rho_Star*vel_K_Star*(merge(1._wp, &
+                                                    & 0._wp, i == 1)*vel_K_Star + (1._wp - merge(1._wp, 0._wp, &
+                                                    & i == 1))*(xi_M*vel_L(${DIDX}$) + xi_P*vel_R(${DIDX}$))) + merge(1._wp, &
+                                                    & 0._wp, i == 1)*p_Star + (s_M/s_L)*(s_P/s_R)*merge(1._wp, 0._wp, i == 1)*pcorr
                                     end do
 
                                     ! ENERGY FLUX. f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
@@ -403,10 +406,10 @@ contains
                                     ! Advection velocity source: interface velocity for volume fraction transport
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
-                                        vel_src_rsx_vf(${SF('')}$, &
-                                                       & ${DIDX}$) = xi_M*(vel_L(${DIDX}$) + merge(1._wp, 0._wp, i == 1) &
-                                                       & *(s_S*(xi_MP*xi_L_m1 + 1) - vel_L(${DIDX}$))) + xi_P*(vel_R(${DIDX}$) &
-                                                       & + merge(1._wp, 0._wp, i == 1)*(s_S*(xi_PP*xi_R_m1 + 1) - vel_R(${DIDX}$)))
+                                        vel_src_rsx_vf(${SF('')}$, ${DIDX}$) = xi_M*(vel_L(${DIDX}$) + merge(1._wp, 0._wp, &
+                                                       & i == 1)*(s_S*(xi_MP*xi_L_m1 + 1) - vel_L(${DIDX}$))) &
+                                                       & + xi_P*(vel_R(${DIDX}$) + merge(1._wp, 0._wp, &
+                                                       & i == 1)*(s_S*(xi_PP*xi_R_m1 + 1) - vel_R(${DIDX}$)))
                                     end do
 
                                     ! INTERNAL ENERGIES ADVECTION FLUX. K-th pressure and velocity in preparation for the internal
@@ -559,8 +562,10 @@ contains
                                     pres_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E)
                                     pres_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E)
 
-                                    call s_compute_energy(pres_L, alpha_rho_L, alpha_L, vel_L_rms, E_L)
-                                    call s_compute_energy(pres_R, alpha_rho_R, alpha_R, vel_R_rms, E_R)
+                                    call s_compute_energy_from_mixture(pres_L, rho_L, gamma_L, pi_inf_L, qv_L, &
+                                                                       & alpha_L(num_fluids), vel_L_rms, E_L)
+                                    call s_compute_energy_from_mixture(pres_R, rho_R, gamma_R, pi_inf_R, qv_R, &
+                                                                       & alpha_R(num_fluids), vel_R_rms, E_R)
 
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
@@ -689,7 +694,8 @@ contains
                                                & - rho_R*vel_R(${PERM[0]}$)*(s_R - vel_R(${PERM[0]}$)))/(rho_L*(s_L &
                                                & - vel_L(${PERM[0]}$)) - rho_R*(s_R - vel_R(${PERM[0]}$)))
                                     else if (wave_speeds == wave_speeds_pressure) then
-                                        pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(${PERM[0]}$) - vel_R(${PERM[0]}$)))
+                                        pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(${PERM[0]}$) &
+                                                            & - vel_R(${PERM[0]}$)))
 
                                         pres_SR = pres_SL
 
@@ -706,7 +712,8 @@ contains
                                         s_L = vel_L(${PERM[0]}$) - c_L*Ms_L
                                         s_R = vel_R(${PERM[0]}$) + c_R*Ms_R
 
-                                        s_S = 5.e-1_wp*((vel_L(${PERM[0]}$) + vel_R(${PERM[0]}$)) + (pres_L - pres_R)/(rho_avg*c_avg))
+                                        s_S = 5.e-1_wp*((vel_L(${PERM[0]}$) + vel_R(${PERM[0]}$)) + (pres_L - pres_R) &
+                                                        & /(rho_avg*c_avg))
                                     end if
 
                                     ! follows Einfeldt et al. s_M/P = min/max(0.,s_L/R)
@@ -762,13 +769,13 @@ contains
                                     do i = 1, num_dims
                                         flux_rsx_vf(${SF('')}$, &
                                                     & eqn_idx%cont%end + ${DIDX}$) = xi_M*(rho_L*(vel_L(${PERM[0]}$) &
-                                                    & *vel_L(${DIDX}$) + s_M*(xi_L*(merge(1._wp, 0._wp, i == 1)*s_S + (1._wp &
-                                                    & - merge(1._wp, 0._wp, i == 1))*vel_L(${DIDX}$)) - vel_L(${DIDX}$))) &
-                                                    & + merge(1._wp, 0._wp, i == 1)*(pres_L)) + xi_P*(rho_R*(vel_R(${PERM[0]}$) &
-                                                    & *vel_R(${DIDX}$) + s_P*(xi_R*(merge(1._wp, 0._wp, i == 1)*s_S + (1._wp &
-                                                    & - merge(1._wp, 0._wp, i == 1))*vel_R(${DIDX}$)) - vel_R(${DIDX}$))) &
-                                                    & + merge(1._wp, 0._wp, i == 1)*(pres_R)) + (s_M/s_L)*(s_P/s_R)*merge(1._wp, 0._wp, i == 1) &
-                                                    & *pcorr
+                                                    & *vel_L(${DIDX}$) + s_M*(xi_L*(merge(1._wp, 0._wp, &
+                                                    & i == 1)*s_S + (1._wp - merge(1._wp, 0._wp, &
+                                                    & i == 1))*vel_L(${DIDX}$)) - vel_L(${DIDX}$))) + merge(1._wp, 0._wp, &
+                                                    & i == 1)*(pres_L)) + xi_P*(rho_R*(vel_R(${PERM[0]}$)*vel_R(${DIDX}$) &
+                                                    & + s_P*(xi_R*(merge(1._wp, 0._wp, i == 1)*s_S + (1._wp - merge(1._wp, 0._wp, &
+                                                    & i == 1))*vel_R(${DIDX}$)) - vel_R(${DIDX}$))) + merge(1._wp, 0._wp, &
+                                                    & i == 1)*(pres_R)) + (s_M/s_L)*(s_P/s_R)*merge(1._wp, 0._wp, i == 1)*pcorr
                                     end do
 
                                     ! Energy flux. f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
@@ -790,9 +797,9 @@ contains
                                     ! Advection velocity source: interface velocity for volume fraction transport
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
-                                        vel_src_rsx_vf(${SF('')}$, &
-                                                       & ${DIDX}$) = xi_M*(vel_L(${DIDX}$) + merge(1._wp, 0._wp, i == 1)*s_M*xi_L_m1) &
-                                                       & + xi_P*(vel_R(${DIDX}$) + merge(1._wp, 0._wp, i == 1)*s_P*xi_R_m1)
+                                        vel_src_rsx_vf(${SF('')}$, ${DIDX}$) = xi_M*(vel_L(${DIDX}$) + merge(1._wp, 0._wp, &
+                                                       & i == 1)*s_M*xi_L_m1) + xi_P*(vel_R(${DIDX}$) + merge(1._wp, 0._wp, &
+                                                       & i == 1)*s_P*xi_R_m1)
                                     end do
 
                                     flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_src_rsx_vf(${SF('')}$, ${PERM[0]}$)
@@ -848,8 +855,8 @@ contains
 
                                             flux_gsrc_rsx_vf(${SF('')}$, &
                                                              & eqn_idx%mom%beg + 1) = -f_compute_hllc_star_momentum_flux(rho_L, &
-                                                             & rho_R, vel_L(${PERM[0]}$), vel_R(${PERM[0]}$), s_M, s_P, s_S, xi_L, &
-                                                             & xi_R, xi_M, xi_P, 1._wp)
+                                                             & rho_R, vel_L(${PERM[0]}$), vel_R(${PERM[0]}$), s_M, s_P, s_S, &
+                                                             & xi_L, xi_R, xi_M, xi_P, 1._wp)
                                             flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%end) = flux_rsx_vf(${SF('')}$, &
                                                              & eqn_idx%mom%beg + 1)
                                         end if
@@ -1057,8 +1064,10 @@ contains
                                             H_L = (E_L + pres_L)/rho_L
                                             H_R = (E_R + pres_R)/rho_R
                                         else
-                                            call s_compute_energy(pres_L, alpha_rho_L, alpha_lim_L, vel_L_rms, E_L)
-                                            call s_compute_energy(pres_R, alpha_rho_R, alpha_lim_R, vel_R_rms, E_R)
+                                            call s_compute_energy_from_mixture(pres_L, rho_L, gamma_L, pi_inf_L, qv_L, &
+                                                                               & alpha_lim_L(num_fluids), vel_L_rms, E_L)
+                                            call s_compute_energy_from_mixture(pres_R, rho_R, gamma_R, pi_inf_R, qv_R, &
+                                                                               & alpha_lim_R(num_fluids), vel_R_rms, E_R)
 
                                             H_L = (E_L + pres_L)/rho_L
                                             H_R = (E_R + pres_R)/rho_R
@@ -1221,7 +1230,8 @@ contains
                                         do i = 1, eqn_idx%cont%end
                                             flux_rsx_vf(${SF('')}$, i) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
                                                         & i)*(vel_L(${PERM[0]}$) + s_M*xi_L_m1) &
-                                                        & + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, i)*(vel_R(${PERM[0]}$) + s_P*xi_R_m1)
+                                                        & + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                        & i)*(vel_R(${PERM[0]}$) + s_P*xi_R_m1)
                                         end do
 
                                         #:if HYPO
@@ -1234,8 +1244,8 @@ contains
                                                 flux_rsx_vf(${SF('')}$, &
                                                             & eqn_idx%cont%end + ${PERM[1]}$) = xi_M*(rho_L*(vel_L(${PERM[0]}$) &
                                                             & *u_t_L + s_M*(xi_L*u_t_star - u_t_L)) - tau_nt_L) &
-                                                            & + xi_P*(rho_R*(vel_R(${PERM[0]}$)*u_t_R + s_P*(xi_R*u_t_star - u_t_R) &
-                                                            & ) - tau_nt_R)
+                                                            & + xi_P*(rho_R*(vel_R(${PERM[0]}$)*u_t_R + s_P*(xi_R*u_t_star &
+                                                            & - u_t_R)) - tau_nt_R)
                                             end if
                                             if (p > 0) then
                                                 flux_rsx_vf(${SF('')}$, &
@@ -1248,15 +1258,15 @@ contains
                                             flux_rsx_vf(${SF('')}$, &
                                                         & eqn_idx%E) = xi_M*((E_L + pres_tot_L)*vel_L(${PERM[0]}$) &
                                                         & - u_t_L*tau_nt_L - u_t2_L*tau_nt2_L + s_M*(xi_L*(E_L + (s_S &
-                                                        & - vel_L(${PERM[0]}$))*(rho_L*s_S + pres_tot_L/(s_L - vel_L(${PERM[0]}$))) &
-                                                        & + (u_t_L*tau_nt_L - u_t_star*tau_nt_star)/(s_L - vel_L(${PERM[0]}$)) &
-                                                        & + (u_t2_L*tau_nt2_L - u_t2_star*tau_nt2_star)/(s_L - vel_L(${PERM[0]}$))) &
-                                                        & - E_L)) + xi_P*((E_R + pres_tot_R)*vel_R(${PERM[0]}$) - u_t_R*tau_nt_R &
-                                                        & - u_t2_R*tau_nt2_R + s_P*(xi_R*(E_R + (s_S - vel_R(${PERM[0]}$)) &
-                                                        & *(rho_R*s_S + pres_tot_R/(s_R - vel_R(${PERM[0]}$))) + (u_t_R*tau_nt_R &
-                                                        & - u_t_star*tau_nt_star)/(s_R - vel_R(${PERM[0]}$)) + (u_t2_R*tau_nt2_R &
-                                                        & - u_t2_star*tau_nt2_star)/(s_R - vel_R(${PERM[0]}$))) - E_R)) + (s_M/s_L) &
-                                                        & *(s_P/s_R)*pcorr*s_S
+                                                        & - vel_L(${PERM[0]}$))*(rho_L*s_S + pres_tot_L/(s_L - vel_L(${PERM[0]}$)) &
+                                                        & ) + (u_t_L*tau_nt_L - u_t_star*tau_nt_star)/(s_L - vel_L(${PERM[0]}$)) &
+                                                        & + (u_t2_L*tau_nt2_L - u_t2_star*tau_nt2_star)/(s_L - vel_L(${PERM[0]}$)) &
+                                                        & ) - E_L)) + xi_P*((E_R + pres_tot_R)*vel_R(${PERM[0]}$) &
+                                                        & - u_t_R*tau_nt_R - u_t2_R*tau_nt2_R + s_P*(xi_R*(E_R + (s_S &
+                                                        & - vel_R(${PERM[0]}$))*(rho_R*s_S + pres_tot_R/(s_R - vel_R(${PERM[0]}$)) &
+                                                        & ) + (u_t_R*tau_nt_R - u_t_star*tau_nt_star)/(s_R - vel_R(${PERM[0]}$)) &
+                                                        & + (u_t2_R*tau_nt2_R - u_t2_star*tau_nt2_star)/(s_R - vel_R(${PERM[0]}$)) &
+                                                        & ) - E_R)) + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                             if (n == 0) then
                                                 flux_rsx_vf(${SF('')}$, &
@@ -1275,14 +1285,14 @@ contains
                                                                 & + xi_P*(rho_R*vel_R(${PERM[0]}$)*tau_nt_R &
                                                                 & + s_P*(rho_R*xi_R*tau_nt_star - rho_R*tau_nt_R))
                                                     flux_rsx_vf(${SF('')}$, &
-                                                                & eqn_idx%stress%beg + 2) = xi_M*rho_L*tau_tt_L*(vel_L(${PERM[0]}$) &
-                                                                & + s_M*(xi_L - 1._wp)) + xi_P*rho_R*tau_tt_R*(vel_R(${PERM[0]}$) &
-                                                                & + s_P*(xi_R - 1._wp))
+                                                                & eqn_idx%stress%beg + 2) &
+                                                                & = xi_M*rho_L*tau_tt_L*(vel_L(${PERM[0]}$) + s_M*(xi_L - 1._wp)) &
+                                                                & + xi_P*rho_R*tau_tt_R*(vel_R(${PERM[0]}$) + s_P*(xi_R - 1._wp))
                                                 else
                                                     flux_rsx_vf(${SF('')}$, &
-                                                                & eqn_idx%stress%beg + 2) = xi_M*rho_L*tau_nn_L*(vel_L(${PERM[0]}$) &
-                                                                & + s_M*(xi_L - 1._wp)) + xi_P*rho_R*tau_nn_R*(vel_R(${PERM[0]}$) &
-                                                                & + s_P*(xi_R - 1._wp))
+                                                                & eqn_idx%stress%beg + 2) &
+                                                                & = xi_M*rho_L*tau_nn_L*(vel_L(${PERM[0]}$) + s_M*(xi_L - 1._wp)) &
+                                                                & + xi_P*rho_R*tau_nn_R*(vel_R(${PERM[0]}$) + s_P*(xi_R - 1._wp))
                                                     flux_rsx_vf(${SF('')}$, &
                                                                 & eqn_idx%stress%beg + 1) = xi_M*(rho_L*vel_L(${PERM[0]}$) &
                                                                 & *tau_nt_L + s_M*(rho_L*xi_L*tau_nt_star - rho_L*tau_nt_L)) &
@@ -1365,13 +1375,14 @@ contains
                                                 ! (dir_flg*s_L/R+(1-dir_flg)*u_i)*xi_m1
                                                 flux_rsx_vf(${SF('')}$, &
                                                             & eqn_idx%cont%end + ${DIDX}$) = xi_M*(rho_L*(vel_L(${PERM[0]}$) &
-                                                            & *vel_L(${DIDX}$) + s_M*(merge(1._wp, 0._wp, i == 1)*s_L + (1._wp &
-                                                            & - merge(1._wp, 0._wp, i == 1))*vel_L(${DIDX}$))*xi_L_m1) &
-                                                            & + merge(1._wp, 0._wp, i == 1)*(pres_L)) + xi_P*(rho_R*(vel_R(${PERM[0]}$) &
-                                                            & *vel_R(${DIDX}$) + s_P*(merge(1._wp, 0._wp, i == 1)*s_R + (1._wp &
-                                                            & - merge(1._wp, 0._wp, i == 1))*vel_R(${DIDX}$))*xi_R_m1) &
-                                                            & + merge(1._wp, 0._wp, i == 1)*(pres_R)) + (s_M/s_L)*(s_P/s_R) &
-                                                            & *merge(1._wp, 0._wp, i == 1)*pcorr
+                                                            & *vel_L(${DIDX}$) + s_M*(merge(1._wp, 0._wp, &
+                                                            & i == 1)*s_L + (1._wp - merge(1._wp, 0._wp, &
+                                                            & i == 1))*vel_L(${DIDX}$))*xi_L_m1) + merge(1._wp, 0._wp, &
+                                                            & i == 1)*(pres_L)) + xi_P*(rho_R*(vel_R(${PERM[0]}$)*vel_R(${DIDX}$) &
+                                                            & + s_P*(merge(1._wp, 0._wp, i == 1)*s_R + (1._wp - merge(1._wp, &
+                                                            & 0._wp, i == 1))*vel_R(${DIDX}$))*xi_R_m1) + merge(1._wp, 0._wp, &
+                                                            & i == 1)*(pres_R)) + (s_M/s_L)*(s_P/s_R)*merge(1._wp, 0._wp, &
+                                                            & i == 1)*pcorr
                                             end do
 
                                             ! ENERGY FLUX. f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
@@ -1389,16 +1400,16 @@ contains
                                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
                                             flux_rsx_vf(${SF('')}$, i) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
                                                         & i)*(vel_L(${PERM[0]}$) + s_M*xi_L_m1) &
-                                                        & + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, i)*(vel_R(${PERM[0]}$) + s_P*xi_R_m1)
+                                                        & + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                        & i)*(vel_R(${PERM[0]}$) + s_P*xi_R_m1)
                                         end do
 
                                         ! VOLUME FRACTION SOURCE FLUX.
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, num_dims
-                                            vel_src_rsx_vf(${SF('')}$, &
-                                                           & ${DIDX}$) = xi_M*(vel_L(${DIDX}$) + merge(1._wp, 0._wp, i == 1) &
-                                                           & *s_M*xi_L_m1) + xi_P*(vel_R(${DIDX}$) + merge(1._wp, 0._wp, i == 1) &
-                                                           & *s_P*xi_R_m1)
+                                            vel_src_rsx_vf(${SF('')}$, ${DIDX}$) = xi_M*(vel_L(${DIDX}$) + merge(1._wp, 0._wp, &
+                                                           & i == 1)*s_M*xi_L_m1) + xi_P*(vel_R(${DIDX}$) + merge(1._wp, 0._wp, &
+                                                           & i == 1)*s_P*xi_R_m1)
                                         end do
 
                                         ! COLOR FUNCTION FLUX
@@ -1591,8 +1602,8 @@ contains
                                                     flux_gsrc_rsx_vf(${SF('')}$, &
                                                                      & eqn_idx%cont%end + ${PERM[0]}$) &
                                                                      & = f_compute_hllc_star_momentum_flux(rho_L, rho_R, &
-                                                                     & vel_L(${PERM[0]}$), vel_R(${PERM[0]}$), s_M, s_P, s_S, xi_L, &
-                                                                     & xi_R, xi_M, xi_P, 1._wp)
+                                                                     & vel_L(${PERM[0]}$), vel_R(${PERM[0]}$), s_M, s_P, s_S, &
+                                                                     & xi_L, xi_R, xi_M, xi_P, 1._wp)
                                                     ! Geometrical source of the void fraction(s) is zero
                                                     $:GPU_LOOP(parallelism='[seq]')
                                                     do i = eqn_idx%adv%beg, eqn_idx%adv%end

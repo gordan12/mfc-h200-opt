@@ -183,15 +183,16 @@ contains
         real(wp), intent(in) :: fR0, fR, fV, fpb
         real(wp)             :: f_cpbw_KM
 
+        ! f_approx_equal(x, dflt_real) is f_is_default(x); the latter is excluded from NVHPC cross-file inlining
         if (polytropic) then
             f_cpbw_KM = Ca*((fR0/fR)**(3._wp*gam)) - Ca + Eu
-            if (.not. f_is_default(Web)) f_cpbw_KM = f_cpbw_KM + (2._wp/(Web*fR0))*((fR0/fR)**(3._wp*gam))
+            if (.not. f_approx_equal(Web, dflt_real)) f_cpbw_KM = f_cpbw_KM + (2._wp/(Web*fR0))*((fR0/fR)**(3._wp*gam))
         else
             f_cpbw_KM = fpb
         end if
 
-        if (.not. f_is_default(Web)) f_cpbw_KM = f_cpbw_KM - 2._wp/(fR*Web)
-        if (.not. f_is_default(Re_inv)) f_cpbw_KM = f_cpbw_KM - 4._wp*Re_inv*fV/fR
+        if (.not. f_approx_equal(Web, dflt_real)) f_cpbw_KM = f_cpbw_KM - 2._wp/(fR*Web)
+        if (.not. f_approx_equal(Re_inv, dflt_real)) f_cpbw_KM = f_cpbw_KM - 4._wp*Re_inv*fV/fR
 
     end function f_cpbw_KM
 
