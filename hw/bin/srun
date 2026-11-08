@@ -1,0 +1,7 @@
+#!/bin/bash
+# Test-harness shim: MFC templates pick srun inside Slurm, but NVHPC HPC-X Open MPI fails MPI_Init under srun
+# (pmi2 and pmix alike) on nano4. Forward "srun --ntasks N exe" to mpirun; anything else goes to the real srun.
+if [ "$1" == "--ntasks" ] && [ $# -eq 3 ]; then
+    exec mpirun -np "$2" --oversubscribe "$3"
+fi
+exec /usr/bin/srun "$@"
