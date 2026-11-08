@@ -383,28 +383,112 @@ contains
 
             $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous]')
 
+            ! One-sided velocity differences on the x, y and z faces (each computed once)
             $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
-                do k = iy%beg, iy%end
-                    do j = is1_viscous%beg + 1, is1_viscous%end
+                do k = is2_viscous%beg, is2_viscous%end
+                    do j = is1_viscous%beg, is1_viscous%end
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = iv%beg, iv%end
-                            dqL_prim_dx_n(1)%vf(i)%sf(j, k, l) = (q_prim_qp%vf(i)%sf(j, k, l) - q_prim_qp%vf(i)%sf(j - 1, k, &
-                                          & l))/(x_cc(j) - x_cc(j - 1))
+                            if (j >= is1_viscous%beg + 1) dqL_prim_dx_n(1)%vf(i)%sf(j, k, l) = (q_prim_qp%vf(i)%sf(j, k, &
+                                & l) - q_prim_qp%vf(i)%sf(j - 1, k, l))/(x_cc(j) - x_cc(j - 1))
+                            if (j <= is1_viscous%end - 1) dqR_prim_dx_n(1)%vf(i)%sf(j, k, l) = (q_prim_qp%vf(i)%sf(j + 1, k, &
+                                & l) - q_prim_qp%vf(i)%sf(j, k, l))/(x_cc(j + 1) - x_cc(j))
+                            #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                                if (n > 0) then
+                                    if (k >= is2_viscous%beg + 1) dqL_prim_dy_n(2)%vf(i)%sf(j, k, l) = (q_prim_qp%vf(i)%sf(j, k, &
+                                        & l) - q_prim_qp%vf(i)%sf(j, k - 1, l))/(y_cc(k) - y_cc(k - 1))
+                                    if (k <= is2_viscous%end - 1) dqR_prim_dy_n(2)%vf(i)%sf(j, k, l) = (q_prim_qp%vf(i)%sf(j, &
+                                        & k + 1, l) - q_prim_qp%vf(i)%sf(j, k, l))/(y_cc(k + 1) - y_cc(k))
+                                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                        if (p > 0) then
+                                            if (l >= is3_viscous%beg + 1) dqL_prim_dz_n(3)%vf(i)%sf(j, k, &
+                                                & l) = (q_prim_qp%vf(i)%sf(j, k, l) - q_prim_qp%vf(i)%sf(j, k, &
+                                                & l - 1))/(z_cc(l) - z_cc(l - 1))
+                                            if (l <= is3_viscous%end - 1) dqR_prim_dz_n(3)%vf(i)%sf(j, k, &
+                                                & l) = (q_prim_qp%vf(i)%sf(j, k, l + 1) - q_prim_qp%vf(i)%sf(j, k, &
+                                                & l))/(z_cc(l + 1) - z_cc(l))
+                                        end if
+                                    #:endif
+                                end if
+                            #:endif
                         end do
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
 
+            ! Cross-face averages of those differences (same expressions as the former per-face kernels)
             $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
-                    do j = is1_viscous%beg, is1_viscous%end - 1
+                    do j = is1_viscous%beg, is1_viscous%end
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = iv%beg, iv%end
-                            dqR_prim_dx_n(1)%vf(i)%sf(j, k, l) = (q_prim_qp%vf(i)%sf(j + 1, k, l) - q_prim_qp%vf(i)%sf(j, k, &
-                                          & l))/(x_cc(j + 1) - x_cc(j))
+                            #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                                if (n > 0) then
+                                    if (j >= is1_viscous%beg + 1 .and. j <= is1_viscous%end - 1 .and. k >= is2_viscous%beg + 1) &
+                                        & dqL_prim_dx_n(2)%vf(i)%sf(j, k, l) = 25.e-2_wp*(dqL_prim_dx_n(1)%vf(i)%sf(j, k, &
+                                        & l) + dqR_prim_dx_n(1)%vf(i)%sf(j, k, l) + dqL_prim_dx_n(1)%vf(i)%sf(j, k - 1, &
+                                        & l) + dqR_prim_dx_n(1)%vf(i)%sf(j, k - 1, l))
+                                    if (j >= is1_viscous%beg + 1 .and. j <= is1_viscous%end - 1 .and. k <= is2_viscous%end - 1) &
+                                        & dqR_prim_dx_n(2)%vf(i)%sf(j, k, l) = 25.e-2_wp*(dqL_prim_dx_n(1)%vf(i)%sf(j, k + 1, &
+                                        & l) + dqR_prim_dx_n(1)%vf(i)%sf(j, k + 1, l) + dqL_prim_dx_n(1)%vf(i)%sf(j, k, &
+                                        & l) + dqR_prim_dx_n(1)%vf(i)%sf(j, k, l))
+                                    if (k >= is2_viscous%beg + 1 .and. k <= is2_viscous%end - 1 .and. j >= is1_viscous%beg + 1) &
+                                        & dqL_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25.e-2_wp*(dqL_prim_dy_n(2)%vf(i)%sf(j, k, &
+                                        & l) + dqR_prim_dy_n(2)%vf(i)%sf(j, k, l) + dqL_prim_dy_n(2)%vf(i)%sf(j - 1, k, &
+                                        & l) + dqR_prim_dy_n(2)%vf(i)%sf(j - 1, k, l))
+                                    if (k >= is2_viscous%beg + 1 .and. k <= is2_viscous%end - 1 .and. j <= is1_viscous%end - 1) &
+                                        & dqR_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25.e-2_wp*(dqL_prim_dy_n(2)%vf(i)%sf(j + 1, k, &
+                                        & l) + dqR_prim_dy_n(2)%vf(i)%sf(j + 1, k, l) + dqL_prim_dy_n(2)%vf(i)%sf(j, k, &
+                                        & l) + dqR_prim_dy_n(2)%vf(i)%sf(j, k, l))
+                                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                        if (p > 0) then
+                                            if (k >= is2_viscous%beg + 1 .and. k <= is2_viscous%end - 1 &
+                                                & .and. l >= is3_viscous%beg + 1) dqL_prim_dy_n(3)%vf(i)%sf(j, k, &
+                                                & l) = 25.e-2_wp*(dqL_prim_dy_n(2)%vf(i)%sf(j, k, &
+                                                & l) + dqR_prim_dy_n(2)%vf(i)%sf(j, k, l) + dqL_prim_dy_n(2)%vf(i)%sf(j, k, &
+                                                & l - 1) + dqR_prim_dy_n(2)%vf(i)%sf(j, k, l - 1))
+                                            if (k >= is2_viscous%beg + 1 .and. k <= is2_viscous%end - 1 &
+                                                & .and. l <= is3_viscous%end - 1) dqR_prim_dy_n(3)%vf(i)%sf(j, k, &
+                                                & l) = 25.e-2_wp*(dqL_prim_dy_n(2)%vf(i)%sf(j, k, &
+                                                & l + 1) + dqR_prim_dy_n(2)%vf(i)%sf(j, k, l + 1) + dqL_prim_dy_n(2)%vf(i)%sf(j, &
+                                                & k, l) + dqR_prim_dy_n(2)%vf(i)%sf(j, k, l))
+                                            if (j >= is1_viscous%beg + 1 .and. j <= is1_viscous%end - 1 &
+                                                & .and. l >= is3_viscous%beg + 1) dqL_prim_dx_n(3)%vf(i)%sf(j, k, &
+                                                & l) = 25.e-2_wp*(dqL_prim_dx_n(1)%vf(i)%sf(j, k, &
+                                                & l) + dqR_prim_dx_n(1)%vf(i)%sf(j, k, l) + dqL_prim_dx_n(1)%vf(i)%sf(j, k, &
+                                                & l - 1) + dqR_prim_dx_n(1)%vf(i)%sf(j, k, l - 1))
+                                            if (j >= is1_viscous%beg + 1 .and. j <= is1_viscous%end - 1 &
+                                                & .and. l <= is3_viscous%end - 1) dqR_prim_dx_n(3)%vf(i)%sf(j, k, &
+                                                & l) = 25.e-2_wp*(dqL_prim_dx_n(1)%vf(i)%sf(j, k, &
+                                                & l + 1) + dqR_prim_dx_n(1)%vf(i)%sf(j, k, l + 1) + dqL_prim_dx_n(1)%vf(i)%sf(j, &
+                                                & k, l) + dqR_prim_dx_n(1)%vf(i)%sf(j, k, l))
+                                            if (l >= is3_viscous%beg + 1 .and. l <= is3_viscous%end - 1 &
+                                                & .and. j >= is1_viscous%beg + 1) dqL_prim_dz_n(1)%vf(i)%sf(j, k, &
+                                                & l) = 25.e-2_wp*(dqL_prim_dz_n(3)%vf(i)%sf(j, k, &
+                                                & l) + dqR_prim_dz_n(3)%vf(i)%sf(j, k, l) + dqL_prim_dz_n(3)%vf(i)%sf(j - 1, k, &
+                                                & l) + dqR_prim_dz_n(3)%vf(i)%sf(j - 1, k, l))
+                                            if (l >= is3_viscous%beg + 1 .and. l <= is3_viscous%end - 1 &
+                                                & .and. j <= is1_viscous%end - 1) dqR_prim_dz_n(1)%vf(i)%sf(j, k, &
+                                                & l) = 25.e-2_wp*(dqL_prim_dz_n(3)%vf(i)%sf(j + 1, k, &
+                                                & l) + dqR_prim_dz_n(3)%vf(i)%sf(j + 1, k, l) + dqL_prim_dz_n(3)%vf(i)%sf(j, k, &
+                                                & l) + dqR_prim_dz_n(3)%vf(i)%sf(j, k, l))
+                                            if (l >= is3_viscous%beg + 1 .and. l <= is3_viscous%end - 1 &
+                                                & .and. k >= is2_viscous%beg + 1) dqL_prim_dz_n(2)%vf(i)%sf(j, k, &
+                                                & l) = 25.e-2_wp*(dqL_prim_dz_n(3)%vf(i)%sf(j, k, &
+                                                & l) + dqR_prim_dz_n(3)%vf(i)%sf(j, k, l) + dqL_prim_dz_n(3)%vf(i)%sf(j, k - 1, &
+                                                & l) + dqR_prim_dz_n(3)%vf(i)%sf(j, k - 1, l))
+                                            if (l >= is3_viscous%beg + 1 .and. l <= is3_viscous%end - 1 &
+                                                & .and. k <= is2_viscous%end - 1) dqR_prim_dz_n(2)%vf(i)%sf(j, k, &
+                                                & l) = 25.e-2_wp*(dqL_prim_dz_n(3)%vf(i)%sf(j, k + 1, &
+                                                & l) + dqR_prim_dz_n(3)%vf(i)%sf(j, k + 1, l) + dqL_prim_dz_n(3)%vf(i)%sf(j, k, &
+                                                & l) + dqR_prim_dz_n(3)%vf(i)%sf(j, k, l))
+                                        end if
+                                    #:endif
+                                end if
+                            #:endif
                         end do
                     end do
                 end do
@@ -412,273 +496,8 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
             if (n > 0) then
-                #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-                    $:GPU_PARALLEL_LOOP(collapse=3)
-                    do l = is3_viscous%beg, is3_viscous%end
-                        do j = is2_viscous%beg + 1, is2_viscous%end
-                            do k = is1_viscous%beg, is1_viscous%end
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = iv%beg, iv%end
-                                    dqL_prim_dy_n(2)%vf(i)%sf(k, j, l) = (q_prim_qp%vf(i)%sf(k, j, l) - q_prim_qp%vf(i)%sf(k, &
-                                                  & j - 1, l))/(y_cc(j) - y_cc(j - 1))
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-
-                    $:GPU_PARALLEL_LOOP(collapse=3)
-                    do l = is3_viscous%beg, is3_viscous%end
-                        do j = is2_viscous%beg, is2_viscous%end - 1
-                            do k = is1_viscous%beg, is1_viscous%end
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = iv%beg, iv%end
-                                    dqR_prim_dy_n(2)%vf(i)%sf(k, j, l) = (q_prim_qp%vf(i)%sf(k, j + 1, l) - q_prim_qp%vf(i)%sf(k, &
-                                                  & j, l))/(y_cc(j + 1) - y_cc(j))
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-
-                    $:GPU_PARALLEL_LOOP(collapse=3)
-                    do l = is3_viscous%beg, is3_viscous%end
-                        do j = is2_viscous%beg + 1, is2_viscous%end
-                            do k = is1_viscous%beg + 1, is1_viscous%end - 1
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = iv%beg, iv%end
-                                    dqL_prim_dx_n(2)%vf(i)%sf(k, j, l) = (dqL_prim_dx_n(1)%vf(i)%sf(k, j, &
-                                                  & l) + dqR_prim_dx_n(1)%vf(i)%sf(k, j, l) + dqL_prim_dx_n(1)%vf(i)%sf(k, j - 1, &
-                                                  & l) + dqR_prim_dx_n(1)%vf(i)%sf(k, j - 1, l))
-
-                                    dqL_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25.e-2_wp*dqL_prim_dx_n(2)%vf(i)%sf(k, j, l)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-
-                    $:GPU_PARALLEL_LOOP(collapse=3)
-                    do l = is3_viscous%beg, is3_viscous%end
-                        do j = is2_viscous%beg, is2_viscous%end - 1
-                            do k = is1_viscous%beg + 1, is1_viscous%end - 1
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = iv%beg, iv%end
-                                    dqR_prim_dx_n(2)%vf(i)%sf(k, j, l) = (dqL_prim_dx_n(1)%vf(i)%sf(k, j + 1, &
-                                                  & l) + dqR_prim_dx_n(1)%vf(i)%sf(k, j + 1, l) + dqL_prim_dx_n(1)%vf(i)%sf(k, j, &
-                                                  & l) + dqR_prim_dx_n(1)%vf(i)%sf(k, j, l))
-
-                                    dqR_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25.e-2_wp*dqR_prim_dx_n(2)%vf(i)%sf(k, j, l)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-
-                    $:GPU_PARALLEL_LOOP(collapse=3)
-                    do l = is3_viscous%beg, is3_viscous%end
-                        do k = is2_viscous%beg + 1, is2_viscous%end - 1
-                            do j = is1_viscous%beg + 1, is1_viscous%end
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = iv%beg, iv%end
-                                    dqL_prim_dy_n(1)%vf(i)%sf(j, k, l) = (dqL_prim_dy_n(2)%vf(i)%sf(j, k, &
-                                                  & l) + dqR_prim_dy_n(2)%vf(i)%sf(j, k, l) + dqL_prim_dy_n(2)%vf(i)%sf(j - 1, k, &
-                                                  & l) + dqR_prim_dy_n(2)%vf(i)%sf(j - 1, k, l))
-
-                                    dqL_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25.e-2_wp*dqL_prim_dy_n(1)%vf(i)%sf(j, k, l)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-
-                    $:GPU_PARALLEL_LOOP(collapse=3)
-                    do l = is3_viscous%beg, is3_viscous%end
-                        do k = is2_viscous%beg + 1, is2_viscous%end - 1
-                            do j = is1_viscous%beg, is1_viscous%end - 1
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = iv%beg, iv%end
-                                    dqR_prim_dy_n(1)%vf(i)%sf(j, k, l) = (dqL_prim_dy_n(2)%vf(i)%sf(j + 1, k, &
-                                                  & l) + dqR_prim_dy_n(2)%vf(i)%sf(j + 1, k, l) + dqL_prim_dy_n(2)%vf(i)%sf(j, k, &
-                                                  & l) + dqR_prim_dy_n(2)%vf(i)%sf(j, k, l))
-
-                                    dqR_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25.e-2_wp*dqR_prim_dy_n(1)%vf(i)%sf(j, k, l)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                #:endif
-
                 if (p > 0) then
                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                        $:GPU_PARALLEL_LOOP(collapse=3)
-                        do j = is3_viscous%beg + 1, is3_viscous%end
-                            do l = is2_viscous%beg, is2_viscous%end
-                                do k = is1_viscous%beg, is1_viscous%end
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = iv%beg, iv%end
-                                        dqL_prim_dz_n(3)%vf(i)%sf(k, l, j) = (q_prim_qp%vf(i)%sf(k, l, j) - q_prim_qp%vf(i)%sf(k, &
-                                                      & l, j - 1))/(z_cc(j) - z_cc(j - 1))
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-
-                        $:GPU_PARALLEL_LOOP(collapse=3)
-                        do j = is3_viscous%beg, is3_viscous%end - 1
-                            do l = is2_viscous%beg, is2_viscous%end
-                                do k = is1_viscous%beg, is1_viscous%end
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = iv%beg, iv%end
-                                        dqR_prim_dz_n(3)%vf(i)%sf(k, l, j) = (q_prim_qp%vf(i)%sf(k, l, &
-                                                      & j + 1) - q_prim_qp%vf(i)%sf(k, l, j))/(z_cc(j + 1) - z_cc(j))
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-
-                        $:GPU_PARALLEL_LOOP(collapse=3)
-                        do l = is3_viscous%beg + 1, is3_viscous%end - 1
-                            do k = is2_viscous%beg, is2_viscous%end
-                                do j = is1_viscous%beg + 1, is1_viscous%end
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = iv%beg, iv%end
-                                        dqL_prim_dz_n(1)%vf(i)%sf(j, k, l) = (dqL_prim_dz_n(3)%vf(i)%sf(j, k, &
-                                                      & l) + dqR_prim_dz_n(3)%vf(i)%sf(j, k, &
-                                                      & l) + dqL_prim_dz_n(3)%vf(i)%sf(j - 1, k, &
-                                                      & l) + dqR_prim_dz_n(3)%vf(i)%sf(j - 1, k, l))
-
-                                        dqL_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25.e-2_wp*dqL_prim_dz_n(1)%vf(i)%sf(j, k, l)
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-
-                        $:GPU_PARALLEL_LOOP(collapse=3)
-                        do l = is3_viscous%beg + 1, is3_viscous%end - 1
-                            do k = is2_viscous%beg, is2_viscous%end
-                                do j = is1_viscous%beg, is1_viscous%end - 1
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = iv%beg, iv%end
-                                        dqR_prim_dz_n(1)%vf(i)%sf(j, k, l) = (dqL_prim_dz_n(3)%vf(i)%sf(j + 1, k, &
-                                                      & l) + dqR_prim_dz_n(3)%vf(i)%sf(j + 1, k, &
-                                                      & l) + dqL_prim_dz_n(3)%vf(i)%sf(j, k, l) + dqR_prim_dz_n(3)%vf(i)%sf(j, k, &
-                                                      & l))
-
-                                        dqR_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25.e-2_wp*dqR_prim_dz_n(1)%vf(i)%sf(j, k, l)
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-
-                        $:GPU_PARALLEL_LOOP(collapse=3)
-                        do l = is3_viscous%beg + 1, is3_viscous%end - 1
-                            do j = is2_viscous%beg + 1, is2_viscous%end
-                                do k = is1_viscous%beg, is1_viscous%end
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = iv%beg, iv%end
-                                        dqL_prim_dz_n(2)%vf(i)%sf(k, j, l) = (dqL_prim_dz_n(3)%vf(i)%sf(k, j, &
-                                                      & l) + dqR_prim_dz_n(3)%vf(i)%sf(k, j, l) + dqL_prim_dz_n(3)%vf(i)%sf(k, &
-                                                      & j - 1, l) + dqR_prim_dz_n(3)%vf(i)%sf(k, j - 1, l))
-
-                                        dqL_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25.e-2_wp*dqL_prim_dz_n(2)%vf(i)%sf(k, j, l)
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-
-                        $:GPU_PARALLEL_LOOP(collapse=3)
-                        do l = is3_viscous%beg + 1, is3_viscous%end - 1
-                            do j = is2_viscous%beg, is2_viscous%end - 1
-                                do k = is1_viscous%beg, is1_viscous%end
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = iv%beg, iv%end
-                                        dqR_prim_dz_n(2)%vf(i)%sf(k, j, l) = (dqL_prim_dz_n(3)%vf(i)%sf(k, j + 1, &
-                                                      & l) + dqR_prim_dz_n(3)%vf(i)%sf(k, j + 1, &
-                                                      & l) + dqL_prim_dz_n(3)%vf(i)%sf(k, j, l) + dqR_prim_dz_n(3)%vf(i)%sf(k, j, &
-                                                      & l))
-
-                                        dqR_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25.e-2_wp*dqR_prim_dz_n(2)%vf(i)%sf(k, j, l)
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-
-                        $:GPU_PARALLEL_LOOP(collapse=3)
-                        do j = is3_viscous%beg + 1, is3_viscous%end
-                            do l = is2_viscous%beg + 1, is2_viscous%end - 1
-                                do k = is1_viscous%beg, is1_viscous%end
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = iv%beg, iv%end
-                                        dqL_prim_dy_n(3)%vf(i)%sf(k, l, j) = (dqL_prim_dy_n(2)%vf(i)%sf(k, l, &
-                                                      & j) + dqR_prim_dy_n(2)%vf(i)%sf(k, l, j) + dqL_prim_dy_n(2)%vf(i)%sf(k, l, &
-                                                      & j - 1) + dqR_prim_dy_n(2)%vf(i)%sf(k, l, j - 1))
-
-                                        dqL_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25.e-2_wp*dqL_prim_dy_n(3)%vf(i)%sf(k, l, j)
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-
-                        $:GPU_PARALLEL_LOOP(collapse=3)
-                        do j = is3_viscous%beg, is3_viscous%end - 1
-                            do l = is2_viscous%beg + 1, is2_viscous%end - 1
-                                do k = is1_viscous%beg, is1_viscous%end
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = iv%beg, iv%end
-                                        dqR_prim_dy_n(3)%vf(i)%sf(k, l, j) = (dqL_prim_dy_n(2)%vf(i)%sf(k, l, &
-                                                      & j + 1) + dqR_prim_dy_n(2)%vf(i)%sf(k, l, &
-                                                      & j + 1) + dqL_prim_dy_n(2)%vf(i)%sf(k, l, &
-                                                      & j) + dqR_prim_dy_n(2)%vf(i)%sf(k, l, j))
-
-                                        dqR_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25.e-2_wp*dqR_prim_dy_n(3)%vf(i)%sf(k, l, j)
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                        $:GPU_PARALLEL_LOOP(collapse=3)
-                        do j = is3_viscous%beg + 1, is3_viscous%end
-                            do l = is2_viscous%beg, is2_viscous%end
-                                do k = is1_viscous%beg + 1, is1_viscous%end - 1
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = iv%beg, iv%end
-                                        dqL_prim_dx_n(3)%vf(i)%sf(k, l, j) = (dqL_prim_dx_n(1)%vf(i)%sf(k, l, &
-                                                      & j) + dqR_prim_dx_n(1)%vf(i)%sf(k, l, j) + dqL_prim_dx_n(1)%vf(i)%sf(k, l, &
-                                                      & j - 1) + dqR_prim_dx_n(1)%vf(i)%sf(k, l, j - 1))
-
-                                        dqL_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25.e-2_wp*dqL_prim_dx_n(3)%vf(i)%sf(k, l, j)
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                        $:GPU_PARALLEL_LOOP(collapse=3)
-                        do j = is3_viscous%beg, is3_viscous%end - 1
-                            do l = is2_viscous%beg, is2_viscous%end
-                                do k = is1_viscous%beg + 1, is1_viscous%end - 1
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = iv%beg, iv%end
-                                        dqR_prim_dx_n(3)%vf(i)%sf(k, l, j) = (dqL_prim_dx_n(1)%vf(i)%sf(k, l, &
-                                                      & j + 1) + dqR_prim_dx_n(1)%vf(i)%sf(k, l, &
-                                                      & j + 1) + dqL_prim_dx_n(1)%vf(i)%sf(k, l, &
-                                                      & j) + dqR_prim_dx_n(1)%vf(i)%sf(k, l, j))
-
-                                        dqR_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25.e-2_wp*dqR_prim_dx_n(3)%vf(i)%sf(k, l, j)
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-
                         do i = iv%beg, iv%end
                             call s_compute_fd_gradient(q_prim_qp%vf(i), dq_prim_dx_qp(1)%vf(i), dq_prim_dy_qp(1)%vf(i), &
                                                        & dq_prim_dz_qp(1)%vf(i))
