@@ -19,11 +19,23 @@ M = {
     "fp64": "sm__pipe_fp64_cycles_active.avg.pct_of_peak_sustained_active",
 }
 BW, FP = 4.8e12, 34e12  # H200 SXM HBM3e B/s, FP64 non-tensor FLOP/s
+# Reports collected with --metrics (see --print-metrics) hold plain totals instead of per-cycle rates
+TOTALS = {"dadd": "smsp__sass_thread_inst_executed_op_dadd_pred_on.sum",
+          "dmul": "smsp__sass_thread_inst_executed_op_dmul_pred_on.sum",
+          "dfma": "smsp__sass_thread_inst_executed_op_dfma_pred_on.sum"}
+if len(sys.argv) > 1 and sys.argv[1] == "--print-metrics":
+    keep = [v for k, v in M.items() if k not in ("dadd", "dmul", "dfma", "cyc")]
+    print(",".join(keep + list(TOTALS.values())))
+    sys.exit(0)
 
-out = subprocess.run(["ncu", "--import", sys.argv[1], "--csv", "--page", "raw", "--metrics", ",".join(M.values())],
+out = subprocess.run(["ncu", "--import", sys.argv[1], "--csv", "--page", "raw", "--metrics",
+                      ",".join(list(M.values()) + list(TOTALS.values()))],
                      capture_output=True, text=True, check=True).stdout
 rows = list(csv.reader(io.StringIO(out)))
 hdr, units, data = rows[0], rows[1], rows[2:]
+if all(v in hdr for v in TOTALS.values()) and M["dadd"] not in hdr:
+    M.update(TOTALS)
+    M["cyc"] = "__one__"  # totals need no cycle scaling
 ix = {k: hdr.index(v) for k, v in M.items() if v in hdr}
 missing = [v for v in M.values() if v not in hdr]
 if missing:
@@ -32,6 +44,8 @@ name_i = hdr.index("Kernel Name")
 
 
 def f(r, k):
+    if M.get(k) == "__one__":
+        return 1.0
     if k not in ix:
         return 0.0
     v = r[ix[k]].replace(",", "")

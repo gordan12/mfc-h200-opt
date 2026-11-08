@@ -9,5 +9,5 @@ R=/work/your_user/mfc-opt/hw/run.sh
 $R $C 1 $TAG-1g -- --gbpp 16 --steps 20
 $R $C 1 $TAG-1g-b -- --gbpp 16 --steps 20
 [ -n "$NSYS" ] && $R $C 1 $TAG-nsys --nsys -- --gbpp 16 --steps 20
-[ -n "$K" ] && $R $C 1 $TAG-ncu --ncu --set full --import-source yes -c 6 -o ncu_$TAG -k "regex:$K"
+[ -n "$K" ] && $R $C 1 $TAG-ncu --ncu --metrics $(python3 /work/your_user/mfc-opt/hw/tools/ncusum.py --print-metrics) -c 6 -o ncu_$TAG -k "regex:$K"
 true
