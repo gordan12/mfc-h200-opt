@@ -56,7 +56,10 @@ exit 0
     	)
         add_dependencies(${ARGS_TARGET} ${ARGS_TARGET}_lib)
         # s_prng_splitmix32: inlined, consecutive calls can all return the last draw (seen with the former xorshift, NVHPC CPU)
-        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib,except:f_is_default,except:s_compute_dt,except:my_inquire,except:s_mpi_abort,except:s_mpi_barrier,except:s_prohibit_abort,except:s_int_to_str,except:s_associate_cbc_coefficients_pointers,except:s_prng_splitmix32)
+        # totalsize: the default per-subprogram budget runs out inside s_hllc_riemann_solver (all three directions are one
+        # subroutine), so NVHPC silently stops inlining after the x-direction kernels and the y/z kernels make real device
+        # calls with their private arrays in local memory (~21 GB of local traffic per y/z sweep on the bubbles benchmark).
+        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib,except:f_is_default,except:s_compute_dt,except:my_inquire,except:s_mpi_abort,except:s_mpi_barrier,except:s_prohibit_abort,except:s_int_to_str,except:s_associate_cbc_coefficients_pointers,except:s_prng_splitmix32,totalsize:400000)
 
         # Exclude these files from cross-file inlining. GPU hot-path files
         # (m_rhs, m_riemann_solvers, m_viscous, m_weno, etc.) keep full IPO.

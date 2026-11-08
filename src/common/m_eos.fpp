@@ -330,14 +330,19 @@ contains
         real(wp), intent(out) :: rho, gamma, pi_inf, dpi, dgamma
 
         rho = max(alpha_rho, sgm_eps)/max(alpha, sgm_eps)
-        if (any_state_dependent_eos) then
-            call s_eos_coefficients(rho, i, gamma, pi_inf, dpi, dgamma)
-        else
-            gamma = gammas(i)
-            pi_inf = pi_infs(i)
-            dpi = 0._wp
-            dgamma = 0._wp
-        end if
+        ! The state-dependent branch is removed by fypp when no fluid needs it: even dead, its call chain into s_reference_curve
+        ! and s_rk4 stops NVHPC from cross-file inlining every caller, such as s_compute_mixture_coefficients and
+        ! s_compute_speed_of_sound, which then run as real device calls with their array arguments in local memory.
+        #:if eos_state_dependent
+            if (any_state_dependent_eos) then
+                call s_eos_coefficients(rho, i, gamma, pi_inf, dpi, dgamma)
+                return
+            end if
+        #:endif
+        gamma = gammas(i)
+        pi_inf = pi_infs(i)
+        dpi = 0._wp
+        dgamma = 0._wp
 
     end subroutine s_phase_coefficients
 
@@ -605,9 +610,16 @@ contains
             $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_fluids
                 rho_K = rho_K + alpha_rho_K(i)
-                alpha_rho_i = alpha_rho_K(i)
-                alpha_i = alpha_K(i)
-                call s_phase_coefficients(alpha_rho_i, alpha_i, i, rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i)
+                #:if eos_state_dependent
+                    alpha_rho_i = alpha_rho_K(i)
+                    alpha_i = alpha_K(i)
+                    call s_phase_coefficients(alpha_rho_i, alpha_i, i, rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i)
+                #:else
+                    ! Constant coefficients (what s_phase_coefficients returns here) read directly: a call-free body is
+                    ! what NVHPC needs to cross-file inline this routine into the Riemann solvers
+                    gamma_i = gammas(i)
+                    pi_inf_i = pi_infs(i)
+                #:endif
                 gamma_K = gamma_K + alpha_K(i)*gamma_i
                 pi_inf_K = pi_inf_K + alpha_K(i)*pi_inf_i
                 qv_K = qv_K + alpha_rho_K(i)*qvs(i)
@@ -684,6 +696,8 @@ contains
         else
             ! Every case below is a bulk modulus over a density. The equation of state enters
             ! only through f_bulk_modulus; the cases differ in how the phases are mixed.
+            ! Frozen-mixing branch only exists in state-dependent builds (see s_phase_coefficients for why)
+            #:if eos_state_dependent
             if (any_state_dependent_eos .and. present(alpha_rho)) then  ! frozen mixing: each phase's modulus at its own density
                 c = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
@@ -703,6 +717,9 @@ contains
                     c = c/rho
                 end if
             else if (alt_soundspeed) then  ! Wood's law: volume-weighted harmonic mean
+            #:else
+            if (alt_soundspeed) then  ! Wood's law: volume-weighted harmonic mean
+            #:endif
                 c = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
