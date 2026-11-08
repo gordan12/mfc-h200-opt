@@ -23,6 +23,7 @@ option(MFC_OpenMP        "Build with OpenMP"                                 OFF
 option(MFC_GCov          "Build with GCov"                                   OFF)
 option(MFC_Unified       "Build with unified CPU & GPU memory (GH-200 only)" OFF)
 option(MFC_Fastmath      "Build with -gpu=fastmath on NV GPUs"               OFF)
+option(MFC_ACC_ASYNC     "NVHPC OpenACC: launch compute regions asynchronously" ON)
 option(MFC_PRE_PROCESS   "Build pre_process"                                 OFF)
 option(MFC_SIMULATION    "Build simulation"                                  OFF)
 option(MFC_POST_PROCESS  "Build post_process"                                OFF)

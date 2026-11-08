@@ -183,6 +183,9 @@ exit 0
 
                 target_link_libraries(${a_target} PRIVATE OpenACC::OpenACC_Fortran)
                 target_compile_definitions(${a_target} PRIVATE MFC_OpenACC MFC_GPU)
+                if (MFC_ACC_ASYNC AND CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+                    target_compile_definitions(${a_target} PRIVATE MFC_ACC_ASYNC)
+                endif()
             elseif((MFC_OpenMP AND ARGS_OpenMP))
                 find_package(OpenMP)
 

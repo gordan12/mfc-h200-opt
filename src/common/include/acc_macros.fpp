@@ -101,6 +101,18 @@
     $:parallelism_val
 #:enddef
 
+#! MFC_ACC_ASYNC (NVHPC OpenACC builds): pure default(present) compute regions and device updates go on the default
+#! async queue, so the host no longer blocks after every kernel (~17 us of cuStreamSynchronize + launch per kernel).
+#! One queue keeps device order, so results are unchanged. Anything the host must observe, or that moves data on the
+#! construct itself (reduction, copy*, create, update host, enter/exit data, host_data), waits for the queue first.
+#:def ACC_ASYNC_VARIANTS(sync_directive, async_directive)
+#if defined(MFC_ACC_ASYNC)
+    $:async_directive
+#else
+    $:sync_directive
+#endif
+#:enddef
+
 #:def ACC_PARALLEL(code, private=None, default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None)
@@ -123,8 +135,11 @@
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
     #:set acc_directive = FOLD_DIRECTIVE('!$acc parallel ' + &
         & acc_clause_val + extraAccArgs_val.strip('\n'), '!$acc').strip('\n')
+    #:set acc_moves_data = any(x is not None for x in [reduction, copy, copyin, copyinReadOnly, copyout, create])
+    #:set acc_async_directive = ('!$acc wait\n' + acc_directive) if acc_moves_data else &
+        & FOLD_DIRECTIVE('!$acc parallel ' + acc_clause_val + extraAccArgs_val.strip('\n') + ' async', '!$acc').strip('\n')
     #:set end_acc_directive = '!$acc end parallel'
-    $:acc_directive
+    $:ACC_ASYNC_VARIANTS(acc_directive, acc_async_directive)
     $:code
     $:end_acc_directive
 #:enddef
@@ -156,7 +171,10 @@
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
     #:set acc_directive = FOLD_DIRECTIVE('!$acc parallel loop ' + &
         & clause_val + extraAccArgs_val.strip('\n'), '!$acc').strip('\n')
-    $:acc_directive
+    #:set acc_moves_data = any(x is not None for x in [reduction, copy, copyin, copyinReadOnly, copyout, create])
+    #:set acc_async_directive = ('!$acc wait\n' + acc_directive) if acc_moves_data else &
+        & FOLD_DIRECTIVE('!$acc parallel loop ' + clause_val + extraAccArgs_val.strip('\n') + ' async', '!$acc').strip('\n')
+    $:ACC_ASYNC_VARIANTS(acc_directive, acc_async_directive)
 #:enddef
 
 #:def ACC_ROUTINE(function_name=None, parallelism=None, nohost=False, extraAccArgs=None)
@@ -238,6 +256,8 @@
         & default_val.strip('\n')
     #:set acc_directive = '!$acc data ' + clause_val + extraAccArgs_val.strip('\n')
     #:set end_acc_directive = '!$acc end data'
+    #:set acc_directive = ACC_ASYNC_VARIANTS(acc_directive, '!$acc wait\n' + acc_directive)
+    #:set end_acc_directive = ACC_ASYNC_VARIANTS(end_acc_directive, '!$acc wait\n' + end_acc_directive)
     $:acc_directive
     $:code
     $:end_acc_directive
@@ -255,7 +275,7 @@
     #:set acc_clause_val = copyin_val.strip('\n') + create_val.strip('\n') + attach_val.strip('\n')
     #! #:set mp_clause_val = to_val.strip('\n') + alloc_val.strip('\n') + alloc_val2.strip('\n')
     #:set acc_directive = '!$acc enter data ' + acc_clause_val + extraAccArgs_val.strip('\n')
-    $:acc_directive
+    $:ACC_ASYNC_VARIANTS(acc_directive, '!$acc wait\n' + acc_directive)
 #:enddef
 
 #:def ACC_EXIT_DATA(copyout=None, delete=None, detach=None, extraAccArgs=None)
@@ -265,7 +285,7 @@
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
     #:set clause_val = copyout_val.strip('\n') + delete_val.strip('\n') + detach_val.strip('\n')
     #:set acc_directive = '!$acc exit data ' + clause_val + extraAccArgs_val.strip('\n')
-    $:acc_directive
+    $:ACC_ASYNC_VARIANTS(acc_directive, '!$acc wait\n' + acc_directive)
 #:enddef
 
 #:def ACC_UPDATE(host=None, device=None, extraAccArgs=None)
@@ -274,7 +294,8 @@
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
     #:set clause_val = host_val.strip('\n') + device_val.strip('\n')
     #:set acc_directive = '!$acc update ' + clause_val + extraAccArgs_val.strip('\n')
-    $:acc_directive
+    #:set acc_async_directive = ('!$acc wait\n' + acc_directive) if host is not None else (acc_directive + ' async')
+    $:ACC_ASYNC_VARIANTS(acc_directive, acc_async_directive)
 #:enddef
 
 #:def ACC_HOST_DATA(code, use_device=None, extraAccArgs=None)
@@ -288,6 +309,8 @@
     #:set clause_val = use_device_val.strip('\n')
     #:set acc_directive = '!$acc host_data ' + clause_val + extraAccArgs_val.strip('\n')
     #:set end_acc_directive = '!$acc end host_data'
+    #:set acc_directive = ACC_ASYNC_VARIANTS(acc_directive, '!$acc wait\n' + acc_directive)
+    #:set end_acc_directive = ACC_ASYNC_VARIANTS(end_acc_directive, end_acc_directive + '\n!$acc wait')
     $:acc_directive
     $:code
     $:end_acc_directive

@@ -586,6 +586,8 @@ contains
             ! update + IBM correction, aside from I/O) over steady-state stages. Wall clock
             ! (not cpu_time, which counts MPI spin-wait) and the minimum (jitter only adds
             ! time) make it reproducible; the min over stages drops the I/O-bearing s==1 stage.
+            ! Async OpenACC builds: the stage time must include the queued device work
+            $:GPU_WAIT()
             call system_clock(stage_t1, clock_rate, clock_max)
             ! Correct the delta for the rare case of the clock counter wrapping past clock_max.
             if (stage_t1 >= stage_t0) then
