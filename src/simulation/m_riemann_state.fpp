@@ -1021,133 +1021,125 @@ contains
         real(wp), dimension(num_fluids) :: alpha_avg
         integer                         :: fl
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_avg, current_tau_shear, current_tau_bulk, &
-                            & vel_src_at_interface, Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx, gamma_dot, D_xx, D_yy, &
-                            & D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, fl]')
-        do l_loop = isz%beg, isz%end
-            do k_loop = isy%beg, isy%end
-                do j_loop = isx%beg, isx%end
-                    idx_right_phys(1) = j_loop
-                    idx_right_phys(2) = k_loop
-                    idx_right_phys(3) = l_loop
-                    idx_right_phys(norm_dir) = idx_right_phys(norm_dir) + 1
+        #:for ND in [1, 2, 3]
+            #:if not MFC_CASE_OPTIMIZATION or ND <= num_dims
+                #:for NN in [True, False]
+                    if (norm_dir == ${ND}$ .and. (any_non_newtonian .eqv. ${'.true.' if NN else '.false.'}$)) then
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_avg, current_tau_shear, &
+                                            & current_tau_bulk, vel_src_at_interface, Re_shear, Re_bulk, divergence_v, i_dim, &
+                                            & vel_comp_idx, gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, fl]')
+                        do l_loop = isz%beg, isz%end
+                            do k_loop = isy%beg, isy%end
+                                do j_loop = isx%beg, isx%end
+                                    idx_right_phys(1) = j_loop
+                                    idx_right_phys(2) = k_loop
+                                    idx_right_phys(3) = l_loop
+                                    idx_right_phys(${ND}$) = idx_right_phys(${ND}$) + 1
 
-                    vel_grad_avg = 0.0_wp
-                    do vel_comp_idx = 1, num_dims
-                        vel_grad_avg(vel_comp_idx, 1) = 0.5_wp*(dvelL_dx_vf(vel_comp_idx)%sf(j_loop, k_loop, &
-                                     & l_loop) + dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), &
-                                     & idx_right_phys(3)))
-                        if (num_dims > 1) then
-                            #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-                                vel_grad_avg(vel_comp_idx, 2) = 0.5_wp*(dvelL_dy_vf(vel_comp_idx)%sf(j_loop, k_loop, &
-                                             & l_loop) + dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), &
-                                             & idx_right_phys(3)))
-                            #:endif
-                        end if
-                        if (num_dims > 2) then
-                            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                                vel_grad_avg(vel_comp_idx, 3) = 0.5_wp*(dvelL_dz_vf(vel_comp_idx)%sf(j_loop, k_loop, &
-                                             & l_loop) + dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), &
-                                             & idx_right_phys(3)))
-                            #:endif
-                        end if
-                    end do
+                                    vel_grad_avg = 0.0_wp
+                                    do vel_comp_idx = 1, num_dims
+                                        vel_grad_avg(vel_comp_idx, 1) = 0.5_wp*(dvelL_dx_vf(vel_comp_idx)%sf(j_loop, k_loop, &
+                                                     & l_loop) + dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                     & idx_right_phys(2), idx_right_phys(3)))
+                                        if (num_dims > 1) then
+                                            #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                                                vel_grad_avg(vel_comp_idx, 2) = 0.5_wp*(dvelL_dy_vf(vel_comp_idx)%sf(j_loop, &
+                                                             & k_loop, l_loop) + dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                             & idx_right_phys(2), idx_right_phys(3)))
+                                            #:endif
+                                        end if
+                                        if (num_dims > 2) then
+                                            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                                vel_grad_avg(vel_comp_idx, 3) = 0.5_wp*(dvelL_dz_vf(vel_comp_idx)%sf(j_loop, &
+                                                             & k_loop, l_loop) + dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                             & idx_right_phys(2), idx_right_phys(3)))
+                                            #:endif
+                                        end if
+                                    end do
 
-                    if (any_non_newtonian) then
-                        D_xx = vel_grad_avg(1, 1); D_yy = 0._wp; D_zz = 0._wp
-                        D_xy = 0._wp; D_xz = 0._wp; D_yz = 0._wp
-                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-                            if (num_dims > 1) then
-                                D_yy = vel_grad_avg(2, 2)
-                                D_xy = 0.5_wp*(vel_grad_avg(1, 2) + vel_grad_avg(2, 1))
-                            end if
-                        #:endif
-                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                            if (num_dims > 2) then
-                                D_zz = vel_grad_avg(3, 3)
-                                D_xz = 0.5_wp*(vel_grad_avg(1, 3) + vel_grad_avg(3, 1))
-                                D_yz = 0.5_wp*(vel_grad_avg(2, 3) + vel_grad_avg(3, 2))
-                            end if
-                        #:endif
-                        gamma_dot = f_compute_shear_rate_from_components(D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
-                        do fl = 1, num_fluids
-                            alpha_avg(fl) = 0.5_wp*(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j_loop, k_loop, &
-                                      & l_loop) + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(idx_right_phys(1), idx_right_phys(2), &
-                                      & idx_right_phys(3)))
-                            ! Raw cell-centered alphas can under/overshoot near interfaces; clamp to [0,1]
-                            alpha_avg(fl) = min(max(alpha_avg(fl), 0._wp), 1._wp)
+                                    #:if NN
+                                        D_xx = vel_grad_avg(1, 1); D_yy = 0._wp; D_zz = 0._wp
+                                        D_xy = 0._wp; D_xz = 0._wp; D_yz = 0._wp
+                                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                                            if (num_dims > 1) then
+                                                D_yy = vel_grad_avg(2, 2)
+                                                D_xy = 0.5_wp*(vel_grad_avg(1, 2) + vel_grad_avg(2, 1))
+                                            end if
+                                        #:endif
+                                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                            if (num_dims > 2) then
+                                                D_zz = vel_grad_avg(3, 3)
+                                                D_xz = 0.5_wp*(vel_grad_avg(1, 3) + vel_grad_avg(3, 1))
+                                                D_yz = 0.5_wp*(vel_grad_avg(2, 3) + vel_grad_avg(3, 2))
+                                            end if
+                                        #:endif
+                                        gamma_dot = f_compute_shear_rate_from_components(D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
+                                        do fl = 1, num_fluids
+                                            alpha_avg(fl) = 0.5_wp*(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j_loop, k_loop, &
+                                                      & l_loop) + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(idx_right_phys(1), &
+                                                      & idx_right_phys(2), idx_right_phys(3)))
+                                            ! Raw cell-centered alphas can under/overshoot near interfaces; clamp to [0,1]
+                                            alpha_avg(fl) = min(max(alpha_avg(fl), 0._wp), 1._wp)
+                                        end do
+                                        call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn)
+                                    #:endif
+
+                                    divergence_v = 0.0_wp
+                                    do i_dim = 1, num_dims
+                                        divergence_v = divergence_v + vel_grad_avg(i_dim, i_dim)
+                                    end do
+
+                                    vel_src_at_interface = 0.0_wp
+                                    #:if NN
+                                        Re_shear = Re_nn(1)
+                                        Re_bulk = Re_nn(2)
+                                    #:else
+                                        Re_shear = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 1)
+                                        Re_bulk = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 2)
+                                    #:endif
+                                    do i_dim = 1, num_dims
+                                        vel_src_at_interface(i_dim) = vel_src_rsx_vf(j_loop, k_loop, l_loop, i_dim)
+                                    end do
+
+                                    if (shear_stress) then
+                                        call s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, &
+                                                                             & current_tau_shear)
+
+                                        do i_dim = 1, num_dims
+                                            flux_src_rsx_vf(j_loop, k_loop, l_loop, &
+                                                            & eqn_idx%mom%beg + i_dim - 1) = flux_src_rsx_vf(j_loop, k_loop, &
+                                                            & l_loop, eqn_idx%mom%beg + i_dim - 1) - current_tau_shear(${ND}$, &
+                                                            & i_dim)
+
+                                            flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%E) = flux_src_rsx_vf(j_loop, k_loop, &
+                                                            & l_loop, &
+                                                            & eqn_idx%E) - vel_src_at_interface(i_dim)*current_tau_shear(${ND}$, &
+                                                            & i_dim)
+                                        end do
+                                    end if
+
+                                    if (bulk_stress) then
+                                        call s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, current_tau_bulk)
+
+                                        do i_dim = 1, num_dims
+                                            flux_src_rsx_vf(j_loop, k_loop, l_loop, &
+                                                            & eqn_idx%mom%beg + i_dim - 1) = flux_src_rsx_vf(j_loop, k_loop, &
+                                                            & l_loop, eqn_idx%mom%beg + i_dim - 1) - current_tau_bulk(${ND}$, i_dim)
+
+                                            flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%E) = flux_src_rsx_vf(j_loop, k_loop, &
+                                                            & l_loop, &
+                                                            & eqn_idx%E) - vel_src_at_interface(i_dim)*current_tau_bulk(${ND}$, &
+                                                            & i_dim)
+                                        end do
+                                    end if
+                                end do
+                            end do
                         end do
-                        call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn)
+                        $:END_GPU_PARALLEL_LOOP()
                     end if
-
-                    divergence_v = 0.0_wp
-                    do i_dim = 1, num_dims
-                        divergence_v = divergence_v + vel_grad_avg(i_dim, i_dim)
-                    end do
-
-                    vel_src_at_interface = 0.0_wp
-                    if (norm_dir == 1) then
-                        if (any_non_newtonian) then
-                            Re_shear = Re_nn(1)
-                            Re_bulk = Re_nn(2)
-                        else
-                            Re_shear = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 1)
-                            Re_bulk = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 2)
-                        end if
-                        do i_dim = 1, num_dims
-                            vel_src_at_interface(i_dim) = vel_src_rsx_vf(j_loop, k_loop, l_loop, i_dim)
-                        end do
-                    else if (norm_dir == 2) then
-                        if (any_non_newtonian) then
-                            Re_shear = Re_nn(1)
-                            Re_bulk = Re_nn(2)
-                        else
-                            Re_shear = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 1)
-                            Re_bulk = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 2)
-                        end if
-                        do i_dim = 1, num_dims
-                            vel_src_at_interface(i_dim) = vel_src_rsx_vf(j_loop, k_loop, l_loop, i_dim)
-                        end do
-                    else
-                        if (any_non_newtonian) then
-                            Re_shear = Re_nn(1)
-                            Re_bulk = Re_nn(2)
-                        else
-                            Re_shear = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 1)
-                            Re_bulk = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 2)
-                        end if
-                        do i_dim = 1, num_dims
-                            vel_src_at_interface(i_dim) = vel_src_rsx_vf(j_loop, k_loop, l_loop, i_dim)
-                        end do
-                    end if
-
-                    if (shear_stress) then
-                        call s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, current_tau_shear)
-
-                        do i_dim = 1, num_dims
-                            flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%mom%beg + i_dim - 1) = flux_src_rsx_vf(j_loop, &
-                                            & k_loop, l_loop, eqn_idx%mom%beg + i_dim - 1) - current_tau_shear(norm_dir, i_dim)
-
-                            flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%E) = flux_src_rsx_vf(j_loop, k_loop, l_loop, &
-                                            & eqn_idx%E) - vel_src_at_interface(i_dim)*current_tau_shear(norm_dir, i_dim)
-                        end do
-                    end if
-
-                    if (bulk_stress) then
-                        call s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, current_tau_bulk)
-
-                        do i_dim = 1, num_dims
-                            flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%mom%beg + i_dim - 1) = flux_src_rsx_vf(j_loop, &
-                                            & k_loop, l_loop, eqn_idx%mom%beg + i_dim - 1) - current_tau_bulk(norm_dir, i_dim)
-
-                            flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%E) = flux_src_rsx_vf(j_loop, k_loop, l_loop, &
-                                            & eqn_idx%E) - vel_src_at_interface(i_dim)*current_tau_bulk(norm_dir, i_dim)
-                        end do
-                    end if
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+                #:endfor
+            #:endif
+        #:endfor
 
     end subroutine s_compute_cartesian_viscous_source_flux
 
