@@ -266,6 +266,14 @@ exit 0
                     PRIVATE -gpu=keep,ptxinfo,lineinfo
                 )
 
+                # Register cap: the big kernels (WENO, HLLC, viscous flux) otherwise use 200+ registers at 12.5%
+                # occupancy; 128 doubles occupancy for little spilling (H200 sweep 96/112/128/168: 128 is fastest).
+                if (MFC_GPU_MAXREG GREATER 0)
+                    target_compile_options(${a_target}
+                        PRIVATE -gpu=maxregcount:${MFC_GPU_MAXREG}
+                    )
+                endif()
+
                 if (MFC_Fastmath)
                     target_compile_options(${a_target}
                         PRIVATE -gpu=fastmath
