@@ -176,6 +176,30 @@ contains
 
     end function f_rddot_G
 
+    !> f_approx_equal(a, dflt_real) written out: the elemental, optional-argument original cannot be inlined across files by NVHPC,
+    !! which left the bubble-wall functions as real calls inside the Riemann and bubble-source kernels.
+    logical function f_bub_is_dflt(a) result(res)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: a
+        real(wp)             :: tol
+
+        if (wp == single_precision) then
+            tol = 1.e-6_wp
+        else
+            tol = 1.e-10_wp
+        end if
+
+        if (a == dflt_real) then
+            res = .true.
+        else if (a == 0._wp .or. (abs(a) + abs(dflt_real) < tiny(a))) then
+            res = (abs(a - dflt_real) < (tol*tiny(a)))
+        else
+            res = (abs(a - dflt_real)/min(abs(a) + abs(dflt_real), huge(a)) < tol)
+        end if
+
+    end function f_bub_is_dflt
+
     !> Keller-Miksis bubble wall pressure
     function f_cpbw_KM(fR0, fR, fV, fpb)
 
@@ -183,16 +207,15 @@ contains
         real(wp), intent(in) :: fR0, fR, fV, fpb
         real(wp)             :: f_cpbw_KM
 
-        ! f_approx_equal(x, dflt_real) is f_is_default(x); the latter is excluded from NVHPC cross-file inlining
         if (polytropic) then
             f_cpbw_KM = Ca*((fR0/fR)**(3._wp*gam)) - Ca + Eu
-            if (.not. f_approx_equal(Web, dflt_real)) f_cpbw_KM = f_cpbw_KM + (2._wp/(Web*fR0))*((fR0/fR)**(3._wp*gam))
+            if (.not. f_bub_is_dflt(Web)) f_cpbw_KM = f_cpbw_KM + (2._wp/(Web*fR0))*((fR0/fR)**(3._wp*gam))
         else
             f_cpbw_KM = fpb
         end if
 
-        if (.not. f_approx_equal(Web, dflt_real)) f_cpbw_KM = f_cpbw_KM - 2._wp/(fR*Web)
-        if (.not. f_approx_equal(Re_inv, dflt_real)) f_cpbw_KM = f_cpbw_KM - 4._wp*Re_inv*fV/fR
+        if (.not. f_bub_is_dflt(Web)) f_cpbw_KM = f_cpbw_KM - 2._wp/(fR*Web)
+        if (.not. f_bub_is_dflt(Re_inv)) f_cpbw_KM = f_cpbw_KM - 4._wp*Re_inv*fV/fR
 
     end function f_cpbw_KM
 
@@ -206,18 +229,18 @@ contains
         real(wp)             :: f_rddot_KM
         if (polytropic) then
             cdot_star = -3._wp*gam*Ca*((fR0/fR)**(3._wp*gam))*fV/fR
-            if (.not. f_is_default(Web)) cdot_star = cdot_star - 3._wp*gam*(2._wp/(Web*fR0))*((fR0/fR)**(3._wp*gam))*fV/fR
+            if (.not. f_bub_is_dflt(Web)) cdot_star = cdot_star - 3._wp*gam*(2._wp/(Web*fR0))*((fR0/fR)**(3._wp*gam))*fV/fR
         else
             cdot_star = fpbdot
         end if
 
-        if (.not. f_is_default(Web)) cdot_star = cdot_star + (2._wp/Web)*fV/(fR**2._wp)
-        if (.not. f_is_default(Re_inv)) cdot_star = cdot_star + 4._wp*Re_inv*((fV/fR)**2._wp)
+        if (.not. f_bub_is_dflt(Web)) cdot_star = cdot_star + (2._wp/Web)*fV/(fR**2._wp)
+        if (.not. f_bub_is_dflt(Re_inv)) cdot_star = cdot_star + 4._wp*Re_inv*((fV/fR)**2._wp)
 
         tmp1 = fV/fC
         tmp2 = 1.5_wp*(fV**2._wp)*(tmp1/3._wp - 1._wp) + (1._wp + tmp1)*(fCpbw - fCp)/fRho + cdot_star*fR/(fRho*fC)
 
-        if (f_is_default(Re_inv)) then
+        if (f_bub_is_dflt(Re_inv)) then
             f_rddot_KM = tmp2/(fR*(1._wp - tmp1))
         else
             f_rddot_KM = tmp2/(fR*(1._wp - tmp1) + 4._wp*Re_inv/(fRho*fC))
