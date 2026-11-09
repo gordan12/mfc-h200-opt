@@ -10,7 +10,7 @@ git rev-parse --short HEAD > $OUT/commit; git diff --stat >> $OUT/commit
 ./mfc.sh run $RUN/$(basename $CASE) -t pre_process simulation --case-optimization --gpu acc -j 12 --binary mpirun \
     -n $NG -g $(seq -s " " 0 $((NG-1))) "$@" 2>&1 | tee $OUT/run.log
 ( cd $RUN && find . -type f \( -path "*/p_all/*" -o -path "*/D/*" -o -path "*/restart_data/*" -o -path "*/silo_hdf5/*" \) | sort | xargs -r md5sum ) > $OUT/out.md5 || true
-[ -n "$KEEP" ] && { mkdir -p $OUT/keep; cp $RUN/restart_data/*.dat $OUT/keep/ 2>/dev/null; }  # KEEP=1: save restart files for numeric comparison
+[ -n "$KEEP" ] && { mkdir -p $OUT/keep; cp $RUN/restart_data/*.dat $OUT/keep/ 2>/dev/null || true; }  # KEEP=1: save restart files for numeric comparison
 cp $RUN/time_data.dat $OUT/ 2>/dev/null || true
 cp -r $RUN/*.qdrep $RUN/*.nsys-rep $RUN/*.ncu-rep $OUT/ 2>/dev/null || true
 rm -rf $RUN
