@@ -175,6 +175,10 @@ module m_global_parameters
     !! viscous flux reads them, only the dqL copies are formed
     logical :: shared_face_grad = .false.
     $:GPU_DECLARE(create='[shared_face_grad]')
+    !> The Cartesian HLL/HLLC viscous flux is the first writer of flux_src(mom, E), so it stores instead of accumulating onto a
+    !! zeroed array (set in m_viscous)
+    logical :: visc_src_store = .false.
+    $:GPU_DECLARE(create='[visc_src_store]')
 
     $:GPU_DECLARE(create='[any_non_newtonian, is_non_newtonian, hb_tau0, hb_K, hb_nn, hb_m_arr, hb_mu_min, hb_mu_max, fluid_inv_re]')
 

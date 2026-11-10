@@ -623,7 +623,7 @@ contains
         ! Reshaping Inputted Data in x-direction
 
         if (norm_dir == 1) then
-            if (viscous .or. surface_tension .or. heat_conduction) then
+            if ((viscous .or. surface_tension .or. heat_conduction) .and. .not. visc_src_store) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%mom%beg, eqn_idx%E
                     do l = is3%beg, is3%end
@@ -669,7 +669,7 @@ contains
 
             ! Reshaping Inputted Data in y-direction
         else if (norm_dir == 2) then
-            if (viscous .or. surface_tension .or. heat_conduction) then
+            if ((viscous .or. surface_tension .or. heat_conduction) .and. .not. visc_src_store) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%mom%beg, eqn_idx%E
                     do l = is3%beg, is3%end
@@ -715,7 +715,7 @@ contains
 
             ! Reshaping Inputted Data in z-direction
         else
-            if (viscous .or. surface_tension .or. heat_conduction) then
+            if ((viscous .or. surface_tension .or. heat_conduction) .and. .not. visc_src_store) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%mom%beg, eqn_idx%E
                     do j = is1%beg, is1%end
@@ -1020,6 +1020,8 @@ contains
         real(wp), dimension(2)          :: Re_nn
         real(wp), dimension(num_fluids) :: alpha_avg
         integer                         :: fl
+        real(wp), dimension(3)          :: src_mom         !< flux_src(mom) of this face, accumulated in registers
+        real(wp)                        :: src_E           !< flux_src(E) of this face
 
         #:for ND in [1, 2, 3]
             #:if not MFC_CASE_OPTIMIZATION or ND <= num_dims
@@ -1027,7 +1029,8 @@ contains
                     if (norm_dir == ${ND}$ .and. (any_non_newtonian .eqv. ${'.true.' if NN else '.false.'}$)) then
                         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_avg, current_tau_shear, &
                                             & current_tau_bulk, vel_src_at_interface, Re_shear, Re_bulk, divergence_v, i_dim, &
-                                            & vel_comp_idx, gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, fl]')
+                                            & vel_comp_idx, gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, fl, &
+                                            & src_mom, src_E]')
                         do l_loop = isz%beg, isz%end
                             do k_loop = isy%beg, isy%end
                                 do j_loop = isx%beg, isx%end
@@ -1212,20 +1215,23 @@ contains
                                         vel_src_at_interface(i_dim) = vel_src_rsx_vf(j_loop, k_loop, l_loop, i_dim)
                                     end do
 
+                                    if (visc_src_store) then
+                                        src_mom = 0._wp; src_E = 0._wp
+                                    else
+                                        do i_dim = 1, num_dims
+                                            src_mom(i_dim) = flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%mom%beg + i_dim - 1)
+                                        end do
+                                        src_E = flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%E)
+                                    end if
+
                                     if (shear_stress) then
                                         call s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, &
                                                                              & current_tau_shear)
 
                                         do i_dim = 1, num_dims
-                                            flux_src_rsx_vf(j_loop, k_loop, l_loop, &
-                                                            & eqn_idx%mom%beg + i_dim - 1) = flux_src_rsx_vf(j_loop, k_loop, &
-                                                            & l_loop, eqn_idx%mom%beg + i_dim - 1) - current_tau_shear(${ND}$, &
-                                                            & i_dim)
+                                            src_mom(i_dim) = src_mom(i_dim) - current_tau_shear(${ND}$, i_dim)
 
-                                            flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%E) = flux_src_rsx_vf(j_loop, k_loop, &
-                                                            & l_loop, &
-                                                            & eqn_idx%E) - vel_src_at_interface(i_dim)*current_tau_shear(${ND}$, &
-                                                            & i_dim)
+                                            src_E = src_E - vel_src_at_interface(i_dim)*current_tau_shear(${ND}$, i_dim)
                                         end do
                                     end if
 
@@ -1233,16 +1239,16 @@ contains
                                         call s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, current_tau_bulk)
 
                                         do i_dim = 1, num_dims
-                                            flux_src_rsx_vf(j_loop, k_loop, l_loop, &
-                                                            & eqn_idx%mom%beg + i_dim - 1) = flux_src_rsx_vf(j_loop, k_loop, &
-                                                            & l_loop, eqn_idx%mom%beg + i_dim - 1) - current_tau_bulk(${ND}$, i_dim)
+                                            src_mom(i_dim) = src_mom(i_dim) - current_tau_bulk(${ND}$, i_dim)
 
-                                            flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%E) = flux_src_rsx_vf(j_loop, k_loop, &
-                                                            & l_loop, &
-                                                            & eqn_idx%E) - vel_src_at_interface(i_dim)*current_tau_bulk(${ND}$, &
-                                                            & i_dim)
+                                            src_E = src_E - vel_src_at_interface(i_dim)*current_tau_bulk(${ND}$, i_dim)
                                         end do
                                     end if
+
+                                    do i_dim = 1, num_dims
+                                        flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%mom%beg + i_dim - 1) = src_mom(i_dim)
+                                    end do
+                                    flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%E) = src_E
                                 end do
                             end do
                         end do

@@ -54,6 +54,10 @@ contains
         shared_face_grad = .not. weno_Re_flux .and. .not. cyl_coord .and. .not. hypoelasticity .and. (riemann_solver == 1 &
             & .or. riemann_solver == 2)
         $:GPU_UPDATE(device='[shared_face_grad]')
+        ! Nothing writes flux_src(mom, E) before this flux on these paths; heat conduction and diffusion add their own terms
+        visc_src_store = .not. cyl_coord .and. .not. hypoelasticity .and. .not. heat_conduction .and. .not. chem_params%diffusion &
+            & .and. (riemann_solver == 1 .or. riemann_solver == 2)
+        $:GPU_UPDATE(device='[visc_src_store]')
 
     end subroutine s_initialize_viscous_module
 
