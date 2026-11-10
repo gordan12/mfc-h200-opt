@@ -1,0 +1,5 @@
+b0982b1a
+ hw/exp.sbatch      |  2 +-
+ hw/ncu.sbatch      |  2 +-
+ hw/tools/ncusum.py | 16 +++++++++++++++-
+ 3 files changed, 17 insertions(+), 3 deletions(-)

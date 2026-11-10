@@ -1,0 +1,8 @@
+c40d47c4
+ CMakeLists.txt                     |  1 +
+ cmake/MFCTargets.cmake             |  3 +++
+ hw/exp.sbatch                      |  3 ++-
+ hw/test.sbatch                     |  1 +
+ src/common/include/acc_macros.fpp  | 33 ++++++++++++++++++++++++++++-----
+ src/simulation/m_time_steppers.fpp |  2 ++
+ 6 files changed, 37 insertions(+), 6 deletions(-)

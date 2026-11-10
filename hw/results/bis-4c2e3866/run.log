@@ -1,0 +1,42 @@
+mfc: Starting...
+mfc: OK > (venv) Entered the Python 3.9.21 virtual environment (3.9-3.14).
+
+      .=++*:          -+*+=.        | your_user@25a-hgpn007 [Linux]
+     :+   -*-        ==   =* .      | ----------------------------
+   :*+      ==      ++    .+-       | 
+  :*##-.....:*+   .#%+++=--+=:::.   | --jobs 12
+  -=-++-======#=--**+++==+*++=::-:. | --mpi --acc-gpu --no-debug --no-reldebug --no-gcov --no-unified --no-single --no-mixed --no-fastmath
+ .:++=----------====+*= ==..:%..... | --targets pre_process and simulation
+  .:-=++++===--==+=-+=   +.  :=     | 
+  +#=::::::::=%=. -+:    =+   *:    | ------------------------------------------------------------------
+ .*=-=*=..    :=+*+:      -...--    | $ ./mfc.sh (build, run, test, clean, new, validate, params) --help
+
+ Acquiring /tmp/mfc-724657-bis-4c2e3866/case.py...
+ Acquiring /tmp/mfc-724657-bis-4c2e3866/case.py...
+ Build | syscheck, syscheck, pre_process, and simulation | Case Optimized: /tmp/mfc-724657-bis-4c2e3866/case.py
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+   Writing a (new) custom thermochem.fpp file.
+   Building syscheck...
+   (build took 107.5s)
+   ✓ Built syscheck
+
+   Installing syscheck...
+   ✓ Installed syscheck
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+   Writing a (new) custom thermochem.fpp file.
+   Building pre_process...
+   (build took 1320.9s)
+   ✓ Built pre_process
+
+   Installing pre_process...
+   ✓ Installed pre_process
+
+ Generating case.fpp.
+   Case optimization is enabled.
+   Writing a (new) custom case.fpp file.
+   Writing a (new) custom thermochem.fpp file.
+   Building simulation...

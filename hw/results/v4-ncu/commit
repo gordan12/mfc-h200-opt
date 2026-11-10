@@ -1,0 +1,5 @@
+c519efd3
+ src/simulation/m_global_parameters.fpp |  4 ++++
+ src/simulation/m_riemann_state.fpp     | 40 ++++++++++++++++++++--------------
+ src/simulation/m_viscous.fpp           |  4 ++++
+ 3 files changed, 32 insertions(+), 16 deletions(-)

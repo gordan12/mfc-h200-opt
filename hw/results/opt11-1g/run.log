@@ -1,0 +1,152 @@
+mfc: Starting...
+mfc: OK > (venv) Entered the Python 3.9.21 virtual environment (3.9-3.14).
+
+      .=++*:          -+*+=.        | your_user@25a-hgpn022 [Linux]
+     :+   -*-        ==   =* .      | ----------------------------
+   :*+      ==      ++    .+-       | 
+  :*##-.....:*+   .#%+++=--+=:::.   | --jobs 12
+  -=-++-======#=--**+++==+*++=::-:. | --mpi --acc-gpu --no-debug --no-reldebug --no-gcov --no-unified --no-single --no-mixed --no-fastmath
+ .:++=----------====+*= ==..:%..... | --targets pre_process and simulation
+  .:-=++++===--==+=-+=   +.  :=     | 
+  +#=::::::::=%=. -+:    =+   *:    | ------------------------------------------------------------------
+ .*=-=*=..    :=+*+:      -...--    | $ ./mfc.sh (build, run, test, clean, new, validate, params) --help
+
+ Acquiring /tmp/mfc-741843-opt11-1g/case.py...
+ Acquiring /tmp/mfc-741843-opt11-1g/case.py...
+ Build | syscheck, syscheck, pre_process, and simulation | Case Optimized: /tmp/mfc-741843-opt11-1g/case.py
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+   Writing a (new) custom thermochem.fpp file.
+   Building syscheck...
+   (build took 10.4s)
+   ✗ Build failed for syscheck
+
+ Build Failed - Error Details:
+╭─────────────────────────────────── Output ───────────────────────────────────╮
+│ -- Found $MFC_CUDA_CC specified. GPU code will be generated for compute      │
+│ capability(ies) 90.                                                          │
+│ -- Performing IPO using -Mextract followed by -Minline                       │
+│ -- Found OpenACC_C: -acc (found version "1.0")                               │
+│ -- Found OpenACC_CXX: -acc (found version "1.0")                             │
+│ -- Found OpenACC_Fortran: -acc (found version "1.0")                         │
+│ -- Found OpenACC_C: -acc                                                     │
+│ -- Found OpenACC_CXX: -acc                                                   │
+│ -- Found OpenACC_Fortran: -acc                                               │
+│ -- Configuring incomplete, errors occurred!                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─────────────────────────────────── Errors ───────────────────────────────────╮
+│ CMake Error at                                                               │
+│ /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindMPI.cmake:1286   │
+│ (try_compile):                                                               │
+│   SOURCE_FROM_VAR failed to open "test_mpi.f90" for writing                  │
+│ Call Stack (most recent call first):                                         │
+│   /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindMPI.cmake:1306 │
+│ (_MPI_try_staged_settings)                                                   │
+│   /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindMPI.cmake:1653 │
+│ (_MPI_check_lang_works)                                                      │
+│   cmake/MFCTargets.cmake:108 (find_package)                                  │
+│   CMakeLists.txt:234 (MFC_SETUP_TARGET)                                      │
+│                                                                              │
+│                                                                              │
+│ CMake Error at                                                               │
+│ /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindMPI.cmake:1286   │
+│ (try_compile):                                                               │
+│   SOURCE_FROM_VAR failed to open "test_mpi.f90" for writing                  │
+│ Call Stack (most recent call first):                                         │
+│   /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindMPI.cmake:1307 │
+│ (_MPI_try_staged_settings)                                                   │
+│   /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindMPI.cmake:1653 │
+│ (_MPI_check_lang_works)                                                      │
+│   cmake/MFCTargets.cmake:108 (find_package)                                  │
+│   CMakeLists.txt:234 (MFC_SETUP_TARGET)                                      │
+│                                                                              │
+│                                                                              │
+│ CMake Error at                                                               │
+│ /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindMPI.cmake:1286   │
+│ (try_compile):                                                               │
+│   SOURCE_FROM_VAR failed to open "mpiver.f90" for writing                    │
+│ Call Stack (most recent call first):                                         │
+│   /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindMPI.cmake:1715 │
+│ (_MPI_try_staged_settings)                                                   │
+│   cmake/MFCTargets.cmake:108 (find_package)                                  │
+│   CMakeLists.txt:234 (MFC_SETUP_TARGET)                                      │
+│                                                                              │
+│                                                                              │
+│ CMake Error at                                                               │
+│ /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindOpenACC.cmake:19 │
+│ 2 (try_compile):                                                             │
+│   SOURCE_FROM_VAR failed to open "OpenACCTryFlag.c" for writing              │
+│ Call Stack (most recent call first):                                         │
+│   /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindOpenACC.cmake: │
+│ 272 (_OPENACC_GET_FLAGS)                                                     │
+│   cmake/MFCTargets.cmake:177 (find_package)                                  │
+│   CMakeLists.txt:234 (MFC_SETUP_TARGET)                                      │
+│                                                                              │
+│                                                                              │
+│ CMake Error at                                                               │
+│ /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindOpenACC.cmake:22 │
+│ 2 (try_compile):                                                             │
+│   SOURCE_FROM_VAR failed to open "OpenACCCheckVersion.c" for writing         │
+│ Call Stack (most recent call first):                                         │
+│   /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindOpenACC.cmake: │
+│ 277 (_OPENACC_GET_SPEC_DATE)                                                 │
+│   cmake/MFCTargets.cmake:177 (find_package)                                  │
+│   CMakeLists.txt:234 (MFC_SETUP_TARGET)                                      │
+│                                                                              │
+│                                                                              │
+│ CMake Error at                                                               │
+│ /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindOpenACC.cmake:19 │
+│ 2 (try_compile):                                                             │
+│   SOURCE_FROM_VAR failed to open "OpenACCTryFlag.cpp" for writing            │
+│ Call Stack (most recent call first):                                         │
+│   /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindOpenACC.cmake: │
+│ 272 (_OPENACC_GET_FLAGS)                                                     │
+│   cmake/MFCTargets.cmake:177 (find_package)                                  │
+│   CMakeLists.txt:234 (MFC_SETUP_TARGET)                                      │
+│                                                                              │
+│                                                                              │
+│ CMake Error at                                                               │
+│ /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindOpenACC.cmake:22 │
+│ 2 (try_compile):                                                             │
+│   SOURCE_FROM_VAR failed to open "OpenACCCheckVersion.cpp" for writing       │
+│ Call Stack (most recent call first):                                         │
+│   /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindOpenACC.cmake: │
+│ 277 (_OPENACC_GET_SPEC_DATE)                                                 │
+│   cmake/MFCTargets.cmake:177 (find_package)                                  │
+│   CMakeLists.txt:234 (MFC_SETUP_TARGET)                                      │
+│                                                                              │
+│                                                                              │
+│ CMake Error at                                                               │
+│ /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindOpenACC.cmake:19 │
+│ 2 (try_compile):                                                             │
+│   SOURCE_FROM_VAR failed to open "OpenACCTryFlag.F90" for writing            │
+│ Call Stack (most recent call first):                                         │
+│   /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindOpenACC.cmake: │
+│ 272 (_OPENACC_GET_FLAGS)                                                     │
+│   cmake/MFCTargets.cmake:177 (find_package)                                  │
+│   CMakeLists.txt:234 (MFC_SETUP_TARGET)                                      │
+│                                                                              │
+│                                                                              │
+│ CMake Error at                                                               │
+│ /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindOpenACC.cmake:22 │
+│ 2 (try_compile):                                                             │
+│   SOURCE_FROM_VAR failed to open "OpenACCCheckVersion.F90" for writing       │
+│ Call Stack (most recent call first):                                         │
+│   /work/envstack/apps/cmake/4.0.0/share/cmake-4.0/Modules/FindOpenACC.cmake: │
+│ 277 (_OPENACC_GET_SPEC_DATE)                                                 │
+│   cmake/MFCTargets.cmake:177 (find_package)                                  │
+│   CMakeLists.txt:234 (MFC_SETUP_TARGET)                                      │
+│                                                                              │
+│                                                                              │
+│ gmake: *** [Makefile:261: cmake_check_build_system] Error 1                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+ 
+
+Error: Failed to build the syscheck target.
+
+Terminated
+
+mfc: ERROR > main.py finished with a 143 exit code.
+mfc: (venv) Exiting the Python virtual environment.

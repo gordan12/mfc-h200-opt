@@ -1,0 +1,10 @@
+mfc: Starting...
+mfc: OK > (venv) Entered the Python 3.9.21 virtual environment (3.9-3.14).
+
+usage: ./mfc.sh [-h]
+                {build,b,run,r,test,t,clean,c,validate,v,new,viz,params,packer,completion,generate,load,lint,format,spelling,precheck,bench,bench_diff,count,count_diff,fp-stability}
+                ...
+./mfc.sh: error: unrecognized arguments: --set full -k regex:
+
+mfc: ERROR > main.py finished with a 2 exit code.
+mfc: (venv) Exiting the Python virtual environment.

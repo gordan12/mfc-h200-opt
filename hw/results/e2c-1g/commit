@@ -1,0 +1,5 @@
+c3d6d176
+ cmake/MFCTargets.cmake                   |   5 +-
+ src/common/m_eos.fpp                     |  39 ++-
+ src/simulation/m_riemann_solver_hllc.fpp | 434 ++++++++++++++++---------------
+ 3 files changed, 251 insertions(+), 227 deletions(-)

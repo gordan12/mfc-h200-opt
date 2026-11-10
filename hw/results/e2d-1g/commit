@@ -1,0 +1,6 @@
+c3d6d176
+ src/common/m_eos.fpp                     | 180 +++++++++++++++----------------
+ src/common/m_variables_conversion.fpp    |  25 ++++-
+ src/simulation/m_bubbles.fpp             |   7 +-
+ src/simulation/m_riemann_solver_hllc.fpp | 137 ++++++++++++-----------
+ 4 files changed, 188 insertions(+), 161 deletions(-)

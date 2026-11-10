@@ -1,0 +1,251 @@
+mfc: Starting...
+mfc: OK > (venv) Entered the Python 3.9.21 virtual environment (3.9-3.14).
+
+      .=++*:          -+*+=.        | your_user@25a-hgpn036 [Linux]
+     :+   -*-        ==   =* .      | ----------------------------
+   :*+      ==      ++    .+-       | 
+  :*##-.....:*+   .#%+++=--+=:::.   | --jobs 12
+  -=-++-======#=--**+++==+*++=::-:. | --mpi --acc-gpu --no-debug --no-reldebug --no-gcov --no-unified --no-single --no-mixed --no-fastmath
+ .:++=----------====+*= ==..:%..... | --targets pre_process and simulation
+  .:-=++++===--==+=-+=   +.  :=     | 
+  +#=::::::::=%=. -+:    =+   *:    | ------------------------------------------------------------------
+ .*=-=*=..    :=+*+:      -...--    | $ ./mfc.sh (build, run, test, clean, new, validate, params) --help
+
+ Acquiring /tmp/mfc-723847-base-ncu/case.py...
+ Acquiring /tmp/mfc-723847-base-ncu/case.py...
+ Build | syscheck, syscheck, pre_process, and simulation | Case Optimized: /tmp/mfc-723847-base-ncu/case.py
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+   Writing a (new) custom thermochem.fpp file.
+   Building syscheck...
+   ✓ Built syscheck
+
+   Installing syscheck...
+   ✓ Installed syscheck
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+   Writing a (new) custom thermochem.fpp file.
+   Building pre_process...
+   ✓ Built pre_process
+
+   Installing pre_process...
+   ✓ Installed pre_process
+
+ Generating case.fpp.
+   Case optimization is enabled.
+   Writing a (new) custom case.fpp file.
+   Writing a (new) custom thermochem.fpp file.
+   Building simulation...
+   ✓ Built simulation
+
+   Installing simulation...
+   ✓ Installed simulation
+
+ Run
+   Using queue system Interactive.
+   Using baked-in template for default.
+   Generating input files for syscheck...
+     Generating syscheck.inp:
+       INFO: Forwarded 0/103 parameters.
+    
+     Generating case.fpp.
+       Writing a (new) custom case.fpp file.
+       Writing a (new) custom thermochem.fpp file.
+   Generating input files for pre_process...
+     Generating pre_process.inp:
+       INFO: Forwarded 72/103 parameters.
+    
+     Generating case.fpp.
+       Writing a (new) custom case.fpp file.
+       Writing a (new) custom thermochem.fpp file.
+   Generating input files for simulation...
+     Generating simulation.inp:
+       INFO: Forwarded 58/103 parameters.
+    
+     Generating case.fpp.
+       Case optimization is enabled.
+       Writing a (new) custom case.fpp file.
+       Writing a (new) custom thermochem.fpp file.
++-----------------------------------------------------------------------------------------------------------+ 
+| MFC case # MFC @ /tmp/mfc-723847-base-ncu/case.py:                                                        |
++-----------------------------------------------------------------------------------------------------------+ 
+| * Start-time     13:33:33                            * Start-date     13:33:33                            |
+| * Partition      N/A                                 * Walltime       01:00:00                            |
+| * Account        N/A                                 * Nodes          1                                   |
+| * Job Name       MFC                                 * Engine         interactive                         |
+| * QoS            N/A                                 * Binary         mpirun                              |
+| * Queue System   Interactive                         * Email          N/A                                 |
++-----------------------------------------------------------------------------------------------------------+ 
+
+mfc: WARNING > This is the default template.
+mfc: WARNING > It is not intended to support all systems and execution engines.
+mfc: WARNING > Consider using a different template via the --computer option if you encounter problems.
+mfc: OK > :) Selected MPI launcher mpirun. Use --binary to override.
+mfc: OK > :) Running syscheck:
+
++ ncu --nvtx --mode=launch-and-attach --cache-control=none --clock-control=none --set full --import-source yes -c 70 -o ncu_base -k 'regex:hllc|weno|viscous|monotonicity|bubble|tvd_rk|convert_conservative|advection_source|pack_weno|additional_physics' mpirun -np 1 /work/your_user/mfc-opt/build/install/gpu-acc-8636d881f2/bin/syscheck
+ [TEST] MPI: call mpi_init(ierr)
+==WARNING== Note: Running with uncontrolled GPU caches. Profiling results may be inconsistent.
+==WARNING== Note: Running with unmodified GPU clocks. If not controlled otherwise, profiling results may be inconsistent.
+==PROF== Connected to process 1241585 (/work/your_user/mfc-opt/build/install/gpu-acc-8636d881f2/bin/syscheck)
+ [TEST] MPI: call mpi_comm_rank(MPI_COMM_WORLD, rank, ierr)
+ [TEST] MPI: call mpi_barrier(MPI_COMM_WORLD, ierr)
+ [TEST] MPI: call assert(rank >= 0)
+ [TEST] MPI: call mpi_comm_size(MPI_COMM_WORLD, nRanks, ierr)
+ [TEST] MPI: call assert(nRanks > 0 .and. rank < nRanks)
+ [TEST] ACC: devtype = acc_get_device_type()
+ [TEST] ACC: num_devices = acc_get_num_devices(devtype)
+ [TEST] ACC: call assert(num_devices > 0)
+ [TEST] ACC: call acc_set_device_num(mod(rank, num_devices), devtype)
+ [TEST] ACC: allocate(arr(1:N))
+ [TEST] ACC: !$acc enter data create(arr(1:N))
+ [TEST] ACC: !$acc parallel loop
+ [TEST] ACC: !$acc update host(arr(1:N))
+ [TEST] ACC: call assert(nint(sum(arr)) == N*(N + 1)/2)
+ [TEST] ACC: !$acc exit data delete(arr)
+ [SKIP] OMP: num_devices = omp_get_num_devices()
+ [SKIP] OMP: call assert(num_devices > 0)
+ [SKIP] OMP: call omp_set_default_device(mod(rank, num_devices))
+ [SKIP] OMP: allocate(arr(1:N))
+ [SKIP] OMP: !$omp target enter data map(alloc: arr(1:N))
+ [SKIP] OMP: !$omp target teams distribute parallel do
+ [SKIP] OMP: !$omp target update from(arr(1:N))
+ [SKIP] OMP: call assert(nint(sum(arr)) == N*(N + 1)/2)
+ [SKIP] OMP: !$omp target exit data map(delete: arr(1:N))
+ [TEST] MPI: call mpi_barrier(MPI_COMM_WORLD, ierr)
+ [TEST] MPI: call mpi_finalize(ierr)
+ 
+ Syscheck: PASSED.
+==PROF== Disconnected from process 1241585
+==WARNING== No kernels were profiled.
+Available Kernels:
+1. syscheck_93
+
+mfc: OK > :) Running pre_process:
+
++ ncu --nvtx --mode=launch-and-attach --cache-control=none --clock-control=none --set full --import-source yes -c 70 -o ncu_base -k 'regex:hllc|weno|viscous|monotonicity|bubble|tvd_rk|convert_conservative|advection_source|pack_weno|additional_physics' mpirun -np 1 /work/your_user/mfc-opt/build/install/gpu-acc-bf9a19fdb8/bin/pre_process
+==WARNING== Note: Running with uncontrolled GPU caches. Profiling results may be inconsistent.
+==WARNING== Note: Running with unmodified GPU clocks. If not controlled otherwise, profiling results may be inconsistent.
+==PROF== Connected to process 1241834 (/work/your_user/mfc-opt/build/install/gpu-acc-bf9a19fdb8/bin/pre_process)
+ Pre-processing a 316x158x158 case on 1 rank(s)
+ Processing patch            1
+ Processing patch            2
+ Elapsed Time    34.70883011817932     
+==PROF== Disconnected from process 1241834
+==WARNING== No kernels were profiled.
+
+mfc: OK > :) Running simulation:
+
++ ncu --nvtx --mode=launch-and-attach --cache-control=none --clock-control=none --set full --import-source yes -c 70 -o ncu_base -k 'regex:hllc|weno|viscous|monotonicity|bubble|tvd_rk|convert_conservative|advection_source|pack_weno|additional_physics' mpirun -np 1 /work/your_user/mfc-opt/build/install/gpu-acc-3eab782f57/bin/simulation
+==WARNING== Note: Running with uncontrolled GPU caches. Profiling results may be inconsistent.
+==WARNING== Note: Running with unmodified GPU clocks. If not controlled otherwise, profiling results may be inconsistent.
+==PROF== Connected to process 1242678 (/work/your_user/mfc-opt/build/install/gpu-acc-3eab782f57/bin/simulation)
+ Simulating a case-optimized 316x158x158 case on 1 rank(s) with OpenACC offloading.
+ [  0%] step 1 of 21 (t_step 0) t/step  0.00E+00s (avg  0.00E+00s) ETA 0:00:00
+==WARNING== Unable to access the following 6 metrics: ctc__rx_bytes_data_user.sum, ctc__rx_bytes_data_user.sum.pct_of_peak_sustained_elapsed, ctc__rx_bytes_data_user.sum.per_second, ctc__tx_bytes_data_user.sum, ctc__tx_bytes_data_user.sum.pct_of_peak_sustained_elapsed, ctc__tx_bytes_data_user.sum.per_second.
+
+
+==PROF== Profiling "m_variables_conversion_s_convert_conservative_to_primitive_variables_420": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_386": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_400": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_416": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_430": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_444": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_461": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_478": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_495": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_515": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_529": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_543": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_561": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_579": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_596": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_614": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_631": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_648": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_664": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 38 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 38 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 38 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_viscous_s_get_viscous_683": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_weno_s_pack_weno_input_arr_877": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_weno_s_weno_1081": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_weno_s_preserve_monotonicity_1506": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_riemann_solver_hllc_s_hllc_riemann_solver_166": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_riemann_solver_hllc_s_hllc_riemann_solver_492": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_riemann_state_s_compute_cartesian_viscous_source_flux_1024": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_rhs_s_compute_advection_source_term_1208": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_rhs_s_compute_additional_physics_rhs_1888": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_bubbles_ee_s_compute_bubbles_ee_rhs_103": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_weno_s_weno_1081": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_weno_s_preserve_monotonicity_1506": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_riemann_solver_hllc_s_hllc_riemann_solver_166": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_riemann_solver_hllc_s_hllc_riemann_solver_492": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_riemann_state_s_compute_cartesian_viscous_source_flux_1024": 0%....50%....100% - 39 passes
+==PROF== Profiling "m_rhs_s_compute_advection_source_term_1292": 0%....50%....100% - 39 passes
+ [  5%] step 2 of 21 (t_step 1) t/step  2.70E+02s (avg  0.00E+00s) ETA 0:00:00
+ [ 10%] step 3 of 21 (t_step 2) t/step  1.57E-01s (avg  0.00E+00s) ETA 0:00:00
+ [ 15%] step 4 of 21 (t_step 3) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:02
+ [ 20%] step 5 of 21 (t_step 4) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:02
+ [ 24%] step 6 of 21 (t_step 5) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:02
+ [ 29%] step 7 of 21 (t_step 6) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:02
+ [ 34%] step 8 of 21 (t_step 7) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:02
+ [ 39%] step 9 of 21 (t_step 8) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:01
+ [ 43%] step 10 of 21 (t_step 9) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:01
+ [ 48%] step 11 of 21 (t_step 10) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:01
+ [ 53%] step 12 of 21 (t_step 11) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:01
+ [ 58%] step 13 of 21 (t_step 12) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:01
+ [ 62%] step 14 of 21 (t_step 13) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:01
+ [ 67%] step 15 of 21 (t_step 14) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:00
+ [ 72%] step 16 of 21 (t_step 15) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:00
+ [ 77%] step 17 of 21 (t_step 16) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:00
+ [ 81%] step 18 of 21 (t_step 17) t/step  1.56E-01s (avg  1.57E-01s) ETA 0:00:00
+ [ 86%] step 19 of 21 (t_step 18) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:00
+ [ 91%] step 20 of 21 (t_step 19) t/step  1.57E-01s (avg  1.57E-01s) ETA 0:00:00
+ Performance:   0.8240664024549782      ns/gp/eq/rhs
+==PROF== Disconnected from process 1242678
+==WARNING== Failed to import the following source files:
+==WARNING==  default
+==PROF== Report: /tmp/mfc-723847-base-ncu/ncu_base.ncu-rep
+
++-----------------------------------------------------------------------------------------------------------+ 
+| Finished MFC:                                                                                             |
+| * Total-time:    440s                                * Exit Code:     0                                   |
+| * End-time:      13:40:53                            * End-date:      13:40:53                            |
++-----------------------------------------------------------------------------------------------------------+ 
+
+mfc: (venv) Exiting the Python virtual environment.
