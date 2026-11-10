@@ -114,6 +114,11 @@ module m_rhs
     type(int_bounds_info) :: iv  !< Vector field indical bounds
     $:GPU_DECLARE(create='[iv]')
 
+    !> Viscous-only flux_src(mom, E) differences are added in the advection flux-difference kernel (same sums, same order) instead
+    !! of a separate read-modify-write pass over rhs
+    logical :: visc_rhs_fused
+    $:GPU_DECLARE(create='[visc_rhs_fused]')
+
     !> @name Indical bounds in the x-, y- and z-directions
     !> @{
     type(int_bounds_info) :: irx, iry, irz
@@ -157,6 +162,10 @@ contains
 
         $:GPU_ENTER_DATA(copyin='[idwbuff]')
         $:GPU_UPDATE(device='[idwbuff]')
+
+        visc_rhs_fused = viscous .and. .not. (surface_tension .or. chem_params%diffusion .or. heat_conduction .or. cyl_coord &
+                                              & .or. hypoelasticity .or. igr)
+        $:GPU_UPDATE(device='[visc_rhs_fused]')
 
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
         @:ALLOCATE(q_prim_qp%vf(1:sys_size))
@@ -772,7 +781,8 @@ contains
                     end if
 
                     ! Viscous stress contribution to RHS
-                    if (viscous .or. surface_tension .or. chem_params%diffusion .or. heat_conduction) then
+                    if ((viscous .or. surface_tension .or. chem_params%diffusion .or. heat_conduction) .and. .not. visc_rhs_fused) &
+                        & then
                         call nvtxStartRange("RHS-ADD-PHYSICS")
                         call s_compute_additional_physics_rhs(id, q_prim_qp%vf, q_T_sf, rhs_vf, dq_prim_dx_qp(1)%vf, &
                                                               & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
@@ -1227,6 +1237,10 @@ contains
                                                                             & fadv_lo) - flux_src_rsx_vf(k_loop - 1, l_loop, &
                                                                             & q_loop, fadv_lo))
                                 end if
+                                if (visc_rhs_fused .and. j >= eqn_idx%mom%beg .and. j <= eqn_idx%E) then
+                                    rhs_val = rhs_val + 1._wp/dx(k_loop)*(flux_src_rsx_vf(k_loop - 1, l_loop, q_loop, &
+                                                                 & j) - flux_src_rsx_vf(k_loop, l_loop, q_loop, j))
+                                end if
                                 rhs_vf(j)%sf(k_loop, l_loop, q_loop) = rhs_val
                             end do
                         end do
@@ -1308,6 +1322,9 @@ contains
                                 if (j >= fadv_lo .and. j <= fadv_hi) then
                                     rhs_val = rhs_val + inv_ds*q_cons_vf%vf(j)%sf(q, k, l)*(flux_src_rsx_vf(q, k, l, &
                                                                             & fadv_lo) - flux_src_rsx_vf(q, k - 1, l, fadv_lo))
+                                end if
+                                if (visc_rhs_fused .and. j >= eqn_idx%mom%beg .and. j <= eqn_idx%E) then
+                                    rhs_val = rhs_val + 1._wp/dy(k)*(flux_src_rsx_vf(q, k - 1, l, j) - flux_src_rsx_vf(q, k, l, j))
                                 end if
                                 rhs_vf(j)%sf(q, k, l) = rhs_val
                             end do
@@ -1475,6 +1492,10 @@ contains
                                     if (j >= fadv_lo .and. j <= fadv_hi) then
                                         rhs_val = rhs_val + inv_ds*q_cons_vf%vf(j)%sf(l, q, k)*(flux_src_rsx_vf(l, q, k, &
                                                                                 & fadv_lo) - flux_src_rsx_vf(l, q, k - 1, fadv_lo))
+                                    end if
+                                    if (visc_rhs_fused .and. j >= eqn_idx%mom%beg .and. j <= eqn_idx%E) then
+                                        rhs_val = rhs_val + 1._wp/dz(k)*(flux_src_rsx_vf(l, q, k - 1, j) - flux_src_rsx_vf(l, q, &
+                                                                     & k, j))
                                     end if
                                     rhs_vf(j)%sf(l, q, k) = rhs_val
                                 end do
