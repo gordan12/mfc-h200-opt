@@ -1113,6 +1113,12 @@ contains
                                             & qR_prim(id)%vf, qL_rsx_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, &
                                             & dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, q_prim_qp%vf, flux_n(id)%vf, &
                                             & flux_src_n(id)%vf, flux_gsrc_n(id)%vf, id, irx, iry, irz)
+        else if (shared_face_grad) then
+            ! The flux kernel averages the face-normal gradients of every direction itself (dqR slots are unused)
+            call s_riemann_solver(qR_rsx_vf, dqL_prim_dx_n(1)%vf, dqL_prim_dy_n(min(2, num_dims))%vf, dqL_prim_dz_n(min(3, &
+                                  & num_dims))%vf, qR_prim(id)%vf, qL_rsx_vf, dqL_prim_dx_n(1)%vf, dqL_prim_dy_n(min(2, &
+                                  & num_dims))%vf, dqL_prim_dz_n(min(3, num_dims))%vf, qL_prim(id)%vf, q_prim_qp%vf, id, irx, &
+                                  & iry, irz)
         else
             call s_riemann_solver(qR_rsx_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, dqR_prim_dz_n(id)%vf, qR_prim(id)%vf, &
                                   & qL_rsx_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, &

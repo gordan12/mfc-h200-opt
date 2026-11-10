@@ -426,70 +426,8 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
             ! Cross-face averages of those differences (same expressions as the former per-face kernels)
-            if (shared_face_grad) then
-                ! Same sums as below with dqR(j) read as dqL(j + 1); only the dqL faces are stored
-                $:GPU_PARALLEL_LOOP(collapse=3)
-                do l = is3_viscous%beg, is3_viscous%end
-                    do k = is2_viscous%beg, is2_viscous%end
-                        do j = is1_viscous%beg, is1_viscous%end
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = iv%beg, iv%end
-                                #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-                                    if (n > 0) then
-                                        if (j >= is1_viscous%beg + 1 .and. j <= is1_viscous%end - 1 .and. k >= is2_viscous%beg &
-                                            & + 1) then
-                                            dqL_prim_dx_n(2)%vf(i)%sf(j, k, l) = 25.e-2_wp*(dqL_prim_dx_n(1)%vf(i)%sf(j, k, &
-                                                          & l) + dqL_prim_dx_n(1)%vf(i)%sf(j + 1, k, &
-                                                          & l) + dqL_prim_dx_n(1)%vf(i)%sf(j, k - 1, &
-                                                          & l) + dqL_prim_dx_n(1)%vf(i)%sf(j + 1, k - 1, l))
-                                        end if
-                                        if (k >= is2_viscous%beg + 1 .and. k <= is2_viscous%end - 1 .and. j >= is1_viscous%beg &
-                                            & + 1) then
-                                            dqL_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25.e-2_wp*(dqL_prim_dy_n(2)%vf(i)%sf(j, k, &
-                                                          & l) + dqL_prim_dy_n(2)%vf(i)%sf(j, k + 1, &
-                                                          & l) + dqL_prim_dy_n(2)%vf(i)%sf(j - 1, k, &
-                                                          & l) + dqL_prim_dy_n(2)%vf(i)%sf(j - 1, k + 1, l))
-                                        end if
-                                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                                            if (p > 0) then
-                                                if (k >= is2_viscous%beg + 1 .and. k <= is2_viscous%end - 1 &
-                                                    & .and. l >= is3_viscous%beg + 1) then
-                                                    dqL_prim_dy_n(3)%vf(i)%sf(j, k, l) = 25.e-2_wp*(dqL_prim_dy_n(2)%vf(i)%sf(j, &
-                                                                  & k, l) + dqL_prim_dy_n(2)%vf(i)%sf(j, k + 1, &
-                                                                  & l) + dqL_prim_dy_n(2)%vf(i)%sf(j, k, &
-                                                                  & l - 1) + dqL_prim_dy_n(2)%vf(i)%sf(j, k + 1, l - 1))
-                                                end if
-                                                if (j >= is1_viscous%beg + 1 .and. j <= is1_viscous%end - 1 &
-                                                    & .and. l >= is3_viscous%beg + 1) then
-                                                    dqL_prim_dx_n(3)%vf(i)%sf(j, k, l) = 25.e-2_wp*(dqL_prim_dx_n(1)%vf(i)%sf(j, &
-                                                                  & k, l) + dqL_prim_dx_n(1)%vf(i)%sf(j + 1, k, &
-                                                                  & l) + dqL_prim_dx_n(1)%vf(i)%sf(j, k, &
-                                                                  & l - 1) + dqL_prim_dx_n(1)%vf(i)%sf(j + 1, k, l - 1))
-                                                end if
-                                                if (l >= is3_viscous%beg + 1 .and. l <= is3_viscous%end - 1 &
-                                                    & .and. j >= is1_viscous%beg + 1) then
-                                                    dqL_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25.e-2_wp*(dqL_prim_dz_n(3)%vf(i)%sf(j, &
-                                                                  & k, l) + dqL_prim_dz_n(3)%vf(i)%sf(j, k, &
-                                                                  & l + 1) + dqL_prim_dz_n(3)%vf(i)%sf(j - 1, k, &
-                                                                  & l) + dqL_prim_dz_n(3)%vf(i)%sf(j - 1, k, l + 1))
-                                                end if
-                                                if (l >= is3_viscous%beg + 1 .and. l <= is3_viscous%end - 1 &
-                                                    & .and. k >= is2_viscous%beg + 1) then
-                                                    dqL_prim_dz_n(2)%vf(i)%sf(j, k, l) = 25.e-2_wp*(dqL_prim_dz_n(3)%vf(i)%sf(j, &
-                                                                  & k, l) + dqL_prim_dz_n(3)%vf(i)%sf(j, k, &
-                                                                  & l + 1) + dqL_prim_dz_n(3)%vf(i)%sf(j, k - 1, &
-                                                                  & l) + dqL_prim_dz_n(3)%vf(i)%sf(j, k - 1, l + 1))
-                                                end if
-                                            end if
-                                        #:endif
-                                    end if
-                                #:endif
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            else
+            ! With shared_face_grad the Riemann viscous flux forms these averages from the dqL faces itself
+            if (.not. shared_face_grad) then
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = is2_viscous%beg, is2_viscous%end

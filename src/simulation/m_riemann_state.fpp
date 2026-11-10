@@ -1039,8 +1039,34 @@ contains
                                     vel_grad_avg = 0.0_wp
                                     do vel_comp_idx = 1, num_dims
                                         if (shared_face_grad) then
-                                            vel_grad_avg(vel_comp_idx, 1) = dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1), &
-                                                         & idx_right_phys(2), idx_right_phys(3))  ! == 0.5*(dvelL + dvelR): the two are equal
+                                            ! dvelR_d*_vf hold the face-normal gradients dqL_prim_d*_n(d); tangential ones are the
+                                            ! cross-face averages the dqR/dqL path stores (same sums, same order), the normal one is
+                                            ! 0.5*(dvelL + dvelR) with dvelL == dvelR
+                                            #:if ND == 1
+                                                vel_grad_avg(vel_comp_idx, 1) = dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                             & idx_right_phys(2), idx_right_phys(3))
+                                            #:elif ND == 2
+                                                vel_grad_avg(vel_comp_idx, &
+                                                             & 1) = 25.e-2_wp*(dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                             & idx_right_phys(2), &
+                                                             & idx_right_phys(3)) + dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1) &
+                                                             & + 1, idx_right_phys(2), &
+                                                             & idx_right_phys(3)) + dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1) &
+                                                             & , idx_right_phys(2) - 1, &
+                                                             & idx_right_phys(3)) + dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1) &
+                                                             & + 1, idx_right_phys(2) - 1, idx_right_phys(3)))
+                                            #:else
+                                                vel_grad_avg(vel_comp_idx, &
+                                                             & 1) = 25.e-2_wp*(dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                             & idx_right_phys(2), &
+                                                             & idx_right_phys(3)) + dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1) &
+                                                             & + 1, idx_right_phys(2), &
+                                                             & idx_right_phys(3)) + dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1) &
+                                                             & , idx_right_phys(2), &
+                                                             & idx_right_phys(3) - 1) &
+                                                             & + dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1) + 1, &
+                                                             & idx_right_phys(2), idx_right_phys(3) - 1))
+                                            #:endif
                                         else
                                             vel_grad_avg(vel_comp_idx, 1) = 0.5_wp*(dvelL_dx_vf(vel_comp_idx)%sf(j_loop, k_loop, &
                                                          & l_loop) + dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1), &
@@ -1049,9 +1075,42 @@ contains
                                         if (num_dims > 1) then
                                             #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                                                 if (shared_face_grad) then
-                                                    vel_grad_avg(vel_comp_idx, &
-                                                                 & 2) = dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), &
-                                                                 & idx_right_phys(2), idx_right_phys(3))  ! == 0.5*(dvelL + dvelR): the two are equal
+                                                    ! dvelR_d*_vf hold the face-normal gradients dqL_prim_d*_n(d); tangential ones
+                                                    ! are the cross-face averages the dqR/dqL path stores (same sums, same order),
+                                                    ! the normal one is 0.5*(dvelL + dvelR) with dvelL == dvelR
+                                                    #:if ND == 2
+                                                        vel_grad_avg(vel_comp_idx, &
+                                                                     & 2) = dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                                     & idx_right_phys(2), idx_right_phys(3))
+                                                    #:elif ND == 1
+                                                        vel_grad_avg(vel_comp_idx, &
+                                                                     & 2) &
+                                                                     & = 25.e-2_wp*(dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1) &
+                                                                     & , idx_right_phys(2), &
+                                                                     & idx_right_phys(3)) &
+                                                                     & + dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                                     & idx_right_phys(2) + 1, &
+                                                                     & idx_right_phys(3)) &
+                                                                     & + dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1) - 1, &
+                                                                     & idx_right_phys(2), &
+                                                                     & idx_right_phys(3)) &
+                                                                     & + dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1) - 1, &
+                                                                     & idx_right_phys(2) + 1, idx_right_phys(3)))
+                                                    #:else
+                                                        vel_grad_avg(vel_comp_idx, &
+                                                                     & 2) &
+                                                                     & = 25.e-2_wp*(dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1) &
+                                                                     & , idx_right_phys(2), &
+                                                                     & idx_right_phys(3)) &
+                                                                     & + dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                                     & idx_right_phys(2) + 1, &
+                                                                     & idx_right_phys(3)) &
+                                                                     & + dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                                     & idx_right_phys(2), &
+                                                                     & idx_right_phys(3) - 1) &
+                                                                     & + dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                                     & idx_right_phys(2) + 1, idx_right_phys(3) - 1))
+                                                    #:endif
                                                 else
                                                     vel_grad_avg(vel_comp_idx, 2) = 0.5_wp*(dvelL_dy_vf(vel_comp_idx)%sf(j_loop, &
                                                                  & k_loop, &
@@ -1063,9 +1122,42 @@ contains
                                         if (num_dims > 2) then
                                             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                                 if (shared_face_grad) then
-                                                    vel_grad_avg(vel_comp_idx, &
-                                                                 & 3) = dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), &
-                                                                 & idx_right_phys(2), idx_right_phys(3))  ! == 0.5*(dvelL + dvelR): the two are equal
+                                                    ! dvelR_d*_vf hold the face-normal gradients dqL_prim_d*_n(d); tangential ones
+                                                    ! are the cross-face averages the dqR/dqL path stores (same sums, same order),
+                                                    ! the normal one is 0.5*(dvelL + dvelR) with dvelL == dvelR
+                                                    #:if ND == 3
+                                                        vel_grad_avg(vel_comp_idx, &
+                                                                     & 3) = dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                                     & idx_right_phys(2), idx_right_phys(3))
+                                                    #:elif ND == 1
+                                                        vel_grad_avg(vel_comp_idx, &
+                                                                     & 3) &
+                                                                     & = 25.e-2_wp*(dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1) &
+                                                                     & , idx_right_phys(2), &
+                                                                     & idx_right_phys(3)) &
+                                                                     & + dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                                     & idx_right_phys(2), &
+                                                                     & idx_right_phys(3) + 1) &
+                                                                     & + dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1) - 1, &
+                                                                     & idx_right_phys(2), &
+                                                                     & idx_right_phys(3)) &
+                                                                     & + dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1) - 1, &
+                                                                     & idx_right_phys(2), idx_right_phys(3) + 1))
+                                                    #:else
+                                                        vel_grad_avg(vel_comp_idx, &
+                                                                     & 3) &
+                                                                     & = 25.e-2_wp*(dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1) &
+                                                                     & , idx_right_phys(2), &
+                                                                     & idx_right_phys(3)) &
+                                                                     & + dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                                     & idx_right_phys(2), &
+                                                                     & idx_right_phys(3) + 1) &
+                                                                     & + dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                                     & idx_right_phys(2) - 1, &
+                                                                     & idx_right_phys(3)) &
+                                                                     & + dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                                     & idx_right_phys(2) - 1, idx_right_phys(3) + 1))
+                                                    #:endif
                                                 else
                                                     vel_grad_avg(vel_comp_idx, 3) = 0.5_wp*(dvelL_dz_vf(vel_comp_idx)%sf(j_loop, &
                                                                  & k_loop, &
