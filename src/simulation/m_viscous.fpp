@@ -508,25 +508,28 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if (n > 0) then
-                if (p > 0) then
-                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+            ! The cell-centre gradients are read only by the cylindrical-axis viscous stress (and by the weno_Re_flux path)
+            if (cyl_coord) then
+                if (n > 0) then
+                    if (p > 0) then
+                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                            do i = iv%beg, iv%end
+                                call s_compute_fd_gradient(q_prim_qp%vf(i), dq_prim_dx_qp(1)%vf(i), dq_prim_dy_qp(1)%vf(i), &
+                                                           & dq_prim_dz_qp(1)%vf(i))
+                            end do
+                        #:endif
+                    else
                         do i = iv%beg, iv%end
                             call s_compute_fd_gradient(q_prim_qp%vf(i), dq_prim_dx_qp(1)%vf(i), dq_prim_dy_qp(1)%vf(i), &
-                                                       & dq_prim_dz_qp(1)%vf(i))
+                                                       & dq_prim_dy_qp(1)%vf(i))
                         end do
-                    #:endif
+                    end if
                 else
                     do i = iv%beg, iv%end
-                        call s_compute_fd_gradient(q_prim_qp%vf(i), dq_prim_dx_qp(1)%vf(i), dq_prim_dy_qp(1)%vf(i), &
-                                                   & dq_prim_dy_qp(1)%vf(i))
+                        call s_compute_fd_gradient(q_prim_qp%vf(i), dq_prim_dx_qp(1)%vf(i), dq_prim_dx_qp(1)%vf(i), &
+                                                   & dq_prim_dx_qp(1)%vf(i))
                     end do
                 end if
-            else
-                do i = iv%beg, iv%end
-                    call s_compute_fd_gradient(q_prim_qp%vf(i), dq_prim_dx_qp(1)%vf(i), dq_prim_dx_qp(1)%vf(i), &
-                                               & dq_prim_dx_qp(1)%vf(i))
-                end do
             end if
         end if
 
