@@ -171,6 +171,11 @@ module m_global_parameters
     real(wp), allocatable, dimension(:) :: fluid_inv_re       !< per-fluid Newtonian inverse-Re
     !> @}
 
+    !> dqR_prim_d*_n(j) and dqL_prim_d*_n(j + 1) are the same face gradient (set in m_viscous); when only the HLL/HLLC Cartesian
+    !! viscous flux reads them, only the dqL copies are formed
+    logical :: shared_face_grad = .false.
+    $:GPU_DECLARE(create='[shared_face_grad]')
+
     $:GPU_DECLARE(create='[any_non_newtonian, is_non_newtonian, hb_tau0, hb_K, hb_nn, hb_m_arr, hb_mu_min, hb_mu_max, fluid_inv_re]')
 
     ! WENO averaging flag: use arithmetic mean or unaltered WENO-reconstructed cell-boundary values

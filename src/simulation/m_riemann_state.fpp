@@ -341,7 +341,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (viscous) then
+                if (viscous .and. .not. shared_face_grad) then
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         do l = isz%beg, isz%end
@@ -389,7 +389,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (viscous) then
+                if (viscous .and. .not. shared_face_grad) then
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         do l = isz%beg, isz%end
@@ -440,7 +440,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (viscous) then
+                if (viscous .and. .not. shared_face_grad) then
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         do l = isz%beg, isz%end
@@ -486,7 +486,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (viscous) then
+                if (viscous .and. .not. shared_face_grad) then
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         do l = isz%beg, isz%end
@@ -535,7 +535,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (viscous) then
+                if (viscous .and. .not. shared_face_grad) then
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         do k = isy%beg, isy%end
@@ -577,7 +577,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (viscous) then
+                if (viscous .and. .not. shared_face_grad) then
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         do k = isy%beg, isy%end
@@ -1038,21 +1038,40 @@ contains
 
                                     vel_grad_avg = 0.0_wp
                                     do vel_comp_idx = 1, num_dims
-                                        vel_grad_avg(vel_comp_idx, 1) = 0.5_wp*(dvelL_dx_vf(vel_comp_idx)%sf(j_loop, k_loop, &
-                                                     & l_loop) + dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1), &
-                                                     & idx_right_phys(2), idx_right_phys(3)))
+                                        if (shared_face_grad) then
+                                            vel_grad_avg(vel_comp_idx, 1) = dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                         & idx_right_phys(2), idx_right_phys(3))  ! == 0.5*(dvelL + dvelR): the two are equal
+                                        else
+                                            vel_grad_avg(vel_comp_idx, 1) = 0.5_wp*(dvelL_dx_vf(vel_comp_idx)%sf(j_loop, k_loop, &
+                                                         & l_loop) + dvelR_dx_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                         & idx_right_phys(2), idx_right_phys(3)))
+                                        end if
                                         if (num_dims > 1) then
                                             #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-                                                vel_grad_avg(vel_comp_idx, 2) = 0.5_wp*(dvelL_dy_vf(vel_comp_idx)%sf(j_loop, &
-                                                             & k_loop, l_loop) + dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), &
-                                                             & idx_right_phys(2), idx_right_phys(3)))
+                                                if (shared_face_grad) then
+                                                    vel_grad_avg(vel_comp_idx, &
+                                                                 & 2) = dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                                 & idx_right_phys(2), idx_right_phys(3))  ! == 0.5*(dvelL + dvelR): the two are equal
+                                                else
+                                                    vel_grad_avg(vel_comp_idx, 2) = 0.5_wp*(dvelL_dy_vf(vel_comp_idx)%sf(j_loop, &
+                                                                 & k_loop, &
+                                                                 & l_loop) + dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                                 & idx_right_phys(2), idx_right_phys(3)))
+                                                end if
                                             #:endif
                                         end if
                                         if (num_dims > 2) then
                                             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                                                vel_grad_avg(vel_comp_idx, 3) = 0.5_wp*(dvelL_dz_vf(vel_comp_idx)%sf(j_loop, &
-                                                             & k_loop, l_loop) + dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), &
-                                                             & idx_right_phys(2), idx_right_phys(3)))
+                                                if (shared_face_grad) then
+                                                    vel_grad_avg(vel_comp_idx, &
+                                                                 & 3) = dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                                 & idx_right_phys(2), idx_right_phys(3))  ! == 0.5*(dvelL + dvelR): the two are equal
+                                                else
+                                                    vel_grad_avg(vel_comp_idx, 3) = 0.5_wp*(dvelL_dz_vf(vel_comp_idx)%sf(j_loop, &
+                                                                 & k_loop, &
+                                                                 & l_loop) + dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), &
+                                                                 & idx_right_phys(2), idx_right_phys(3)))
+                                                end if
                                             #:endif
                                         end if
                                     end do
